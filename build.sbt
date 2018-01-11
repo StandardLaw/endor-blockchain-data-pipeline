@@ -6,7 +6,17 @@ enablePlugins(GitVersioning)
 git.useGitDescribe := true
 
 val sparkVersion = "2.2.0"
+val playVersion = "2.6.8"
+val emrProvidedAwsSdkVersion = "1.11.160"
+val emrProvidedHadoopVersion = "2.7.3"
 val sparkScalaVersion = "2.11.8" // Spark relies on a specific version of Scala (including for some hacks)
+val playExclusionRules = Seq(
+  ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
+  ExclusionRule("com.google.guava", "guava"),
+  ExclusionRule("org.slf4j", "slf4j-api"),
+  ExclusionRule("org.slf4j", "jcl-over-slf4j"),
+  ExclusionRule("com.typesafe.play", "build-link")
+)
 
 lazy val defaultSettings = Seq(
   name := "endor-blockchain-data-pipeline",
@@ -49,21 +59,12 @@ lazy val defaultSettings = Seq(
     Resolver.mavenLocal,
     Resolver.sonatypeRepo("public"),
     Resolver.typesafeRepo("releases"),
-    "ethereum" at "https://dl.bintray.com/ethereum/maven/",
-    "jitpack" at "https://jitpack.io"
+    "jitpack" at "https://jitpack.io",
+    "ethereum" at "https://dl.bintray.com/ethereum/maven/"
   ),
 
   // This needs to be here for Coursier to be able to resolve the "tests" classifier, otherwise the classifier's ignored
-  classpathTypes += "test-jar",
-
-  libraryDependencies ++= Seq(
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-hive"                   % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion    % "provided,test"
-  ),
-
-  dependencyOverrides ++= Seq()
+  classpathTypes += "test-jar"
 )
 
 lazy val assemblySettings = Seq(
@@ -89,8 +90,51 @@ lazy val assemblySettings = Seq(
   }
 )
 
-lazy val root = project.in(file("."))
+lazy val `serialization` = project.in(file("libraries/serialization"))
+  .settings(defaultSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.joda"                    % "joda-convert"    % "1.9.2",
+      "com.typesafe.play"          %% "play-json"       % playVersion   % "provided",
+      "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided"
+    )
+  )
+
+lazy val `jobnik-client` = project.in(file("libraries/jobnik-client"))
+  .dependsOn(`serialization`)
+  .settings(defaultSettings)
+  .settings(
+    resolvers ++= Seq(
+      Resolver.mavenLocal,
+      Resolver.sonatypeRepo("public"),
+      Resolver.typesafeRepo("releases")
+    ),
+
+    libraryDependencies ++= Seq(
+      "com.amazonaws"        % "aws-java-sdk"                 % emrProvidedAwsSdkVersion  % "provided,test",
+      "com.google.guava"     % "guava"                        % "11.0.2"                  % "provided",
+
+      "net.debasishg"       %% "redisclient"                  % "3.4",
+      "org.slf4j"            % "slf4j-api"                    % "1.7.25",
+      "com.typesafe.play"   %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
+
+      "ch.qos.logback"       % "logback-classic"              % "1.2.3"                   % "test",
+      "org.scalatest"       %% "scalatest"                    % "2.2.6"                   % "test"
+    )
+  )
+
+lazy val pipeline = project.in(file("pipeline"))
+  .dependsOn(`jobnik-client`, serialization)
   .settings(defaultSettings ++ assemblySettings)
+  .settings(libraryDependencies ++= Seq(
+    "org.apache.spark"             %% "spark-core"                   % sparkVersion    % "provided,test",
+    "org.apache.spark"             %% "spark-sql"                    % sparkVersion    % "provided,test",
+    "org.apache.spark"             %% "spark-hive"                   % sparkVersion    % "provided,test",
+    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion    % "provided,test",
+    "com.github.EndorCoin"         %  "spark-blockchain-datasource"  % "408f378496b4b21e8d88b181b5a55c3c5bb1768b",
+
+    "org.scalatest"                %% "scalatest"                    % "2.2.6"         % "test"
+  ))
   .settings(
     // Allow parallel execution of tests as long as each of them gets its own JVM to create a SparkContext on (see SPARK-2243)
     fork in Test := true,
