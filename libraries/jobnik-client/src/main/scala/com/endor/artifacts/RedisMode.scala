@@ -1,7 +1,7 @@
 package com.endor.artifacts
 
 import com.endor.jobnik.JobnikSession
-import com.endor.serialization.formatFor
+import com.endor.serialization._
 import com.redis.RedisClient
 import play.api.libs.json._
 

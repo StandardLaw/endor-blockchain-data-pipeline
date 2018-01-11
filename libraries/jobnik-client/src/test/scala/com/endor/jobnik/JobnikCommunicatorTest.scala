@@ -1,6 +1,5 @@
 package com.endor.jobnik
 
-import com.endor.artifacts.elasticsearch.ElasticsearchProxy
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.{JsObject, JsString}
 
@@ -16,7 +15,7 @@ class JobnikCommunicatorTest extends FunSuite with Matchers {
     val jobnikCommunicator = new JobnikCommunicator((_: String, jsonMessage: String) => {
       buffer += jsonMessage
       mutable.Buffer("aa")
-    }, ElasticsearchProxy.foundProxy)
+    })
 
     implicit val jobnikSession: Option[JobnikSession] = Option(JobnikSession("jobnik-role", JsObject(Seq(("a", JsString("aaa"))))))
     jobnikCommunicator.sendProgressIndication("driver", 2)

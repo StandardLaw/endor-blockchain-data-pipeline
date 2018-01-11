@@ -131,7 +131,8 @@ lazy val pipeline = project.in(file("pipeline"))
     "org.apache.spark"             %% "spark-sql"                    % sparkVersion    % "provided,test",
     "org.apache.spark"             %% "spark-hive"                   % sparkVersion    % "provided,test",
     "org.apache.spark"             %% "spark-catalyst"               % sparkVersion    % "provided,test",
-    "com.github.EndorCoin"         %  "spark-blockchain-datasource"  % "408f378496b4b21e8d88b181b5a55c3c5bb1768b",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "408f378496b4b21e8d88b181b5a55c3c5bb1768b",
+    "net.debasishg"                %% "redisclient"                  % "3.4",
 
     "org.scalatest"                %% "scalatest"                    % "2.2.6"         % "test"
   ))
@@ -142,3 +143,7 @@ lazy val pipeline = project.in(file("pipeline"))
       .value
       .map(test => Group(test.name, Seq(test), SubProcess(ForkOptions())))
   )
+
+lazy val root = project.in(file("."))
+  .settings(defaultSettings)
+  .aggregate(pipeline, `jobnik-client`, `serialization`)
