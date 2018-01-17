@@ -1,4 +1,4 @@
-package com.endor.blockchain.ethereum
+package com.endor.blockchain.ethereum.transaction
 
 import java.sql.Timestamp
 

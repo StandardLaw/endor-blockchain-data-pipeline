@@ -8,16 +8,9 @@ import scala.collection.mutable
   * Created by izik on 01/06/2016.
   */
 object CallsiteContext {
-  def buildJobGroupAndDescription(operation : String,
-                                  customer :String,
-                                  execId :String,
-                                  subIdentifiers : Map[String, String]) : (String, String) = {
-    val addedInfo = subIdentifiers.map {
-      case (k, v) => s"$k = $v"
-    }.mkString(", ")
-    val jobGroup = s"$operation (customer = $customer, execution_id = $execId)"
-    val description = s"$addedInfo"
-    (jobGroup, description)
+  def buildJobGroupAndDescription(operation : String) : (String, String) = {
+    val jobGroup = s"$operation ()"
+    (jobGroup, "")
   }
 
   val Mock: CallsiteContext = new CallsiteContext()
@@ -31,12 +24,9 @@ class CallsiteContext {
 
   private var sparkContext : Option[SparkContext] = None
 
-  def initContext(sc : SparkContext, operation : String,
-                  customer :String,
-                  execId :String,
-                  subIdentifiers : Map[String, String] = Map[String, String]()) : Unit = {
+  def initContext(sc : SparkContext, operation : String) : Unit = {
     sparkContext = Option(sc)
-    val (builtJobGroup, builtDescription) = CallsiteContext.buildJobGroupAndDescription(operation, customer, execId, subIdentifiers)
+    val (builtJobGroup, builtDescription) = CallsiteContext.buildJobGroupAndDescription(operation)
     contextInitParams = Option((builtJobGroup, builtDescription))
     sc.setJobGroup(builtJobGroup, builtDescription)
   }

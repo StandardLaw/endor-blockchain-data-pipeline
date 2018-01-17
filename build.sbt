@@ -1,5 +1,4 @@
 // Every once in a while run `sbt dependencyUpdates` and `sbt dependencyCheckAggregate` here
-import Tests._
 import sbt.librarymanagement.Resolver
 
 enablePlugins(GitVersioning)
@@ -8,7 +7,6 @@ git.useGitDescribe := true
 val sparkVersion = "2.2.0"
 val playVersion = "2.6.8"
 val emrProvidedAwsSdkVersion = "1.11.160"
-val emrProvidedHadoopVersion = "2.7.3"
 val sparkScalaVersion = "2.11.8" // Spark relies on a specific version of Scala (including for some hacks)
 val playExclusionRules = Seq(
   ExclusionRule("com.fasterxml.jackson.core", "jackson-databind"),
@@ -127,22 +125,17 @@ lazy val pipeline = project.in(file("pipeline"))
   .dependsOn(`jobnik-client`, serialization)
   .settings(defaultSettings ++ assemblySettings)
   .settings(libraryDependencies ++= Seq(
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-hive"                   % sparkVersion    % "provided,test",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion    % "provided,test",
-    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "7a9cbc118bec02e067e43eae420825bd330e3cd4",
+    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-hive"                   % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "provided,test",
+    "com.amazonaws"                 % "aws-java-sdk"                 % emrProvidedAwsSdkVersion  % "provided,test",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "master-SNAPSHOT",
     "net.debasishg"                %% "redisclient"                  % "3.4",
+    "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
 
-    "org.scalatest"                %% "scalatest"                    % "2.2.6"         % "test"
+    "org.scalatest"                %% "scalatest"                    % "2.2.6"                   % "test"
   ))
-  .settings(
-    // Allow parallel execution of tests as long as each of them gets its own JVM to create a SparkContext on (see SPARK-2243)
-    fork in Test := true,
-    testGrouping in Test := (definedTests in Test)
-      .value
-      .map(test => Group(test.name, Seq(test), SubProcess(ForkOptions())))
-  )
 
 lazy val root = project.in(file("."))
   .settings(defaultSettings)

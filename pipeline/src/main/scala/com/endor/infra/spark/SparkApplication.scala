@@ -24,8 +24,6 @@ object DIConfiguration {
 }
 
 abstract class SparkApplication[T: Reads] {
-  protected def nodesPerDriver: Int
-
   protected def createEntryPointConfig(configuration: SparkEntryPointConfiguration[T]): EntryPointConfig
   protected def run(sparkSession: SparkSession, configuration: T)
                    (implicit context: Context, jobnikSession: Option[JobnikSession]): Unit
@@ -82,7 +80,7 @@ abstract class SparkApplication[T: Reads] {
           // We have to initialize a SparkSession because yarn.ApplicationMaster expects
           // one to be initialized in every app
           val spark = SparkSession.builder()
-            .appName(s"${entryPointConfig.operation} - ${entryPointConfig.customer}")
+            .appName(entryPointConfig.operation)
             .getOrCreate()
 
           if (!jobAborted.getOrElse(false)) {
