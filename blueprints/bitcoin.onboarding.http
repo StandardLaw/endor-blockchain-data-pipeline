@@ -34,7 +34,7 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
-        "onboard_enriched_Polling": {
+        "onboard_enriched_polling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
@@ -55,7 +55,7 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
-        "onboard_largeRecords_Polling": {
+        "onboard_largeRecords_polling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
@@ -75,7 +75,7 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
-        "onboard_smallRecords_Polling": {
+        "onboard_smallRecords_polling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
@@ -96,7 +96,7 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
-        "onboard_largeActiveRecords_Polling": {
+        "onboard_largeActiveRecords_polling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
@@ -116,7 +116,7 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
-        "onboard_smallActiveRecords_Polling": {
+        "onboard_smallActiveRecords_polling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
@@ -129,9 +129,9 @@ Content-Type: application/json
     "dependencies": [
         { "origin": "deleteOnboardedData", "destination": "parseNewBlocks" },
         { "origin": "parseNewBlocks", "destination": "write_enrichedBlockchain" },
-        { "origin": "write_enrichedBlockchain", "destination": "differentiateLargeSmallTransactions" },
+        { "origin": "write_enrichedBlockchain", "destination": "differentiate_largeSmallTransactions" },
         { "origin": "write_enrichedBlockchain", "destination": "write_largeRecords" },
-        { "origin": "write_enrichedBlockchain", "destination": "write_lmallRecords" },
+        { "origin": "write_enrichedBlockchain", "destination": "write_smallRecords" },
         { "origin": "write_enrichedBlockchain", "destination": "differentiate_activeAddresses" },
         { "origin": "write_enrichedBlockchain", "destination": "onboard_enriched" },
         {
