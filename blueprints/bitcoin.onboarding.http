@@ -34,6 +34,15 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
+        "onboard_enriched_Polling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
+            }
+        },
         "differentiate_largeSmallTransactions": { /* TODO: */ },
         "write_largeRecords": { /* TODO: */ },
         "onboard_largeRecords": {
@@ -46,6 +55,15 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
+        "onboard_largeRecords_Polling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
+            }
+        },
         "write_smallRecords": { /* TODO: */ },
         "onboard_smallRecords": {
             "jobType": "onboard",
@@ -55,6 +73,15 @@ Content-Type: application/json
                 "logicalDateTime": "${logicalDate}T00:00:00Z",
                 "token": "Key ${token}",
                 "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "onboard_smallRecords_Polling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
             }
         },
         "differentiate_activeAddresses": { /* TODO: */ },
@@ -69,6 +96,15 @@ Content-Type: application/json
                 "dataschemeIds": [/* TODO: */]
             }
         },
+        "onboard_largeActiveRecords_Polling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
+            }
+        },
         "write_smallActiveRecords": { /* TODO: */ },
         "onboard_smallActiveRecords": {
             "jobType": "onboard",
@@ -78,6 +114,15 @@ Content-Type: application/json
                 "logicalDateTime": "${logicalDate}T00:00:00Z",
                 "token": "Key ${token}",
                 "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "onboard_smallActiveRecords_Polling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
             }
         }
     },
@@ -89,15 +134,40 @@ Content-Type: application/json
         { "origin": "write_enrichedBlockchain", "destination": "write_lmallRecords" },
         { "origin": "write_enrichedBlockchain", "destination": "differentiate_activeAddresses" },
         { "origin": "write_enrichedBlockchain", "destination": "onboard_enriched" },
+        {
+            "origin": "onboard_enriched",
+            "destination": "onboard_enriched_polling",
+            "symbols": [ { "symbolName": "taskId", "fieldPath": "taskId" } ]
+        },
         { "origin": "differentiate_largeSmallTransactions", "destination": "write_largeRecords" },
         { "origin": "differentiate_largeSmallTransactions", "destination": "write_smallRecords" },
         { "origin": "write_largeRecords", "destination": "write_largeActiveRecords" },
         { "origin": "write_largeRecords", "destination": "onboard_largeRecords" },
+        {
+            "origin": "onboard_largeRecords",
+            "destination": "onboard_largeRecords_polling",
+            "symbols": [ { "symbolName": "taskId", "fieldPath": "taskId" } ]
+        },
         { "origin": "write_smallRecords", "destination": "write_smallActiveRecords" },
         { "origin": "write_smallRecords", "destination": "onboard_smallRecords" },
+        {
+            "origin": "onboard_smallRecords",
+            "destination": "onboard_smallRecords_polling",
+            "symbols": [ { "symbolName": "taskId", "fieldPath": "taskId" } ]
+        },
         { "origin": "differentiate_activeAddresses", "destination": "write_largeActiveRecords" },
         { "origin": "differentiate_activeAddresses", "destination": "write_smallActiveRecords" },
         { "origin": "write_largeActiveRecords", "destination": "onboard_largeActiveRecords" },
-        { "origin": "write_smallActiveRecords", "destination": "onboard_smallActiveRecords" }
+        {
+            "origin": "onboard_largeActiveRecords",
+            "destination": "onboard_largeActiveRecords_polling",
+            "symbols": [ { "symbolName": "taskId", "fieldPath": "taskId" } ]
+        },
+        { "origin": "write_smallActiveRecords", "destination": "onboard_smallActiveRecords" },
+        {
+            "origin": "onboard_smallActiveRecords",
+            "destination": "onboard_smallActiveRecords_polling",
+            "symbols": [ { "symbolName": "taskId", "fieldPath": "taskId" } ]
+        }
     ]
 }
