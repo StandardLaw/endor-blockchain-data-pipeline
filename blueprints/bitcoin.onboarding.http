@@ -1,0 +1,103 @@
+POST https://127.0.0.1:3333/blueprints/create
+Content-Type: application/json
+
+{
+    "args": {
+        "clusterSetName": "productionClusterSet",
+        "facadeHost": "localhost",
+        "token": "Le2V2BiBJluW6+7vS8sX3uGPn8W+yY6Gh/m9C1Nz",
+        "customerName": "bitcoin",
+        "customerId": "123123123123123123123123",
+        "logicalDate": "1970-01-01",
+        "minUnparsedBlockNumber": ""
+    },
+    "metadata": {
+        "type": "onboard-bitcoin",
+        "customer": "bitcoin"
+    },
+    "jobs": {
+        "deleteOnboardedData": {
+            "jobType": "shellCommand",
+            "body": {
+                "cmd": "aws s3 rm --recursive --exclude='*' --include='*data-parquet*' s3://sandbox-${customerName}/OnBoarding/"
+            }
+        },
+        "parseNewBlocks": { /* TODO: */ },
+        "write_enrichedBlockchain": { /* TODO: */ },
+        "onboard_enriched": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}",
+                "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "differentiate_largeSmallTransactions": { /* TODO: */ },
+        "write_largeRecords": { /* TODO: */ },
+        "onboard_largeRecords": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}",
+                "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "write_smallRecords": { /* TODO: */ },
+        "onboard_smallRecords": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}",
+                "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "differentiate_activeAddresses": { /* TODO: */ },
+        "write_sargeActiveRecords": { /* TODO: */ },
+        "onboard_largeActiveRecords": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}",
+                "dataschemeIds": [/* TODO: */]
+            }
+        },
+        "write_smallActiveRecords": { /* TODO: */ },
+        "onboard_smallActiveRecords": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}",
+                "dataschemeIds": [/* TODO: */]
+            }
+        }
+    },
+    "dependencies": [
+        { "origin": "deleteOnboardedData", "destination": "parseNewBlocks" },
+        { "origin": "parseNewBlocks", "destination": "write_enrichedBlockchain" },
+        { "origin": "write_enrichedBlockchain", "destination": "differentiateLargeSmallTransactions" },
+        { "origin": "write_enrichedBlockchain", "destination": "write_largeRecords" },
+        { "origin": "write_enrichedBlockchain", "destination": "write_lmallRecords" },
+        { "origin": "write_enrichedBlockchain", "destination": "differentiate_activeAddresses" },
+        { "origin": "write_enrichedBlockchain", "destination": "onboard_enriched" },
+        { "origin": "differentiate_largeSmallTransactions", "destination": "write_largeRecords" },
+        { "origin": "differentiate_largeSmallTransactions", "destination": "write_smallRecords" },
+        { "origin": "write_largeRecords", "destination": "write_largeActiveRecords" },
+        { "origin": "write_largeRecords", "destination": "onboard_largeRecords" },
+        { "origin": "write_smallRecords", "destination": "write_smallActiveRecords" },
+        { "origin": "write_smallRecords", "destination": "onboard_smallRecords" },
+        { "origin": "differentiate_activeAddresses", "destination": "write_largeActiveRecords" },
+        { "origin": "differentiate_activeAddresses", "destination": "write_smallActiveRecords" },
+        { "origin": "write_largeActiveRecords", "destination": "onboard_largeActiveRecords" },
+        { "origin": "write_smallActiveRecords", "destination": "onboard_smallActiveRecords" }
+    ]
+}
