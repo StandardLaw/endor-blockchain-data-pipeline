@@ -72,6 +72,7 @@ lazy val assemblySettings = Seq(
   assemblyMergeStrategy in assembly := {
     case x if x.endsWith("application.conf") => MergeStrategy.first
     case x if x.endsWith(".class") => MergeStrategy.last
+    case x if x.endsWith("logback.xml") => MergeStrategy.first
     case x if x.endsWith("version.properties") => MergeStrategy.concat
     case x if x.endsWith(".properties") => MergeStrategy.last
     case x if x.contains("/resources/") => MergeStrategy.last
@@ -133,7 +134,12 @@ lazy val pipeline = project.in(file("pipeline"))
     "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "master-SNAPSHOT",
     "net.debasishg"                %% "redisclient"                  % "3.4",
     "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
+    "io.logz.logback"               % "logzio-logback-appender"      % "1.0.17"              exclude("com.google.guava", "guava"),
+    "ch.qos.logback"                % "logback-classic"              % "1.2.3",
 
+    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "test" classifier "tests",
     "org.scalatest"                %% "scalatest"                    % "2.2.6"                   % "test"
   ))
 
