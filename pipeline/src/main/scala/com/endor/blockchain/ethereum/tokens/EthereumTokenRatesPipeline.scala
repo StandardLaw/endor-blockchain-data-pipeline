@@ -24,7 +24,7 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
                                 (implicit spark: SparkSession){
   def run(config: EthereumTokenRatesPipelineConfig): Unit = {
     val lastFetchedDate = ioHandler
-      .listFiles(config.lastFetchedPath)
+      .listFiles(ioHandler.extractPathFromFullURI(config.lastFetchedPath))
       .headOption
       .map(_.key)
       .map(ioHandler.loadRawData)
@@ -51,7 +51,7 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
             implicit val ec: ExecutionContext = ExecutionContext.global
             val fetcher = new TokenRatesFetcher()(system)
             it
-              .map(symbol => Await.result(fetcher.fetchRate(symbol), 1 minute))
+              .flatMap(symbol => Await.result(fetcher.fetchRate(symbol), 1 minute))
         }
         .write
         .mode(SaveMode.Append)

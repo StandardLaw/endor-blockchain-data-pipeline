@@ -1,19 +1,25 @@
 package com.endor.blockchain.ethereum.tokens
 
+import akka.actor.ActorSystem
+import ch.qos.logback.classic.{Logger, LoggerContext}
 import com.endor.blockchain.ethereum.ByteArrayUtil
+import com.endor.infra.{LoggingComponent, SparkSessionComponent}
 import com.endor.spark.blockchain._
 import com.endor.spark.blockchain.ethereum.block.EthereumBlockHeader
 import com.endor.spark.blockchain.ethereum.token.TokenTransferEvent
-import com.endor.spark.blockchain.ethereum.token.metadata.{TokenMetadata, TokenMetadataScraper}
-import com.endor.storage.io.IOHandler
+import com.endor.spark.blockchain.ethereum.token.metadata._
+import com.endor.storage.io.{IOHandler, IOHandlerComponent}
 import org.apache.spark.sql.types.DataTypes
 import org.apache.spark.sql.{Dataset, SaveMode, SparkSession, functions => F}
+import org.web3j.protocol.Web3j
+import org.web3j.protocol.http.HttpService
 import play.api.libs.json._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 
-final case class EthereumTokensPipelineConfig(input: String, blocksInput: String, output: String, metadataPath: String)
+final case class EthereumTokensPipelineConfig(input: String, blocksInput: String, output: String,
+                                              metadataCachePath: String, metadataOutputPath: String)
 
 object EthereumTokensPipelineConfig {
   implicit val format: OFormat[EthereumTokensPipelineConfig] = Json.format[EthereumTokensPipelineConfig]
@@ -21,22 +27,26 @@ object EthereumTokensPipelineConfig {
 
 final case class BlockInfo(number: Long, timestamp: java.sql.Timestamp)
 
-class EthereumTokensPipeline(scraper: TokenMetadataScraper, ioHandler: IOHandler)
-                            (implicit spark: SparkSession) {
+class EthereumTokensPipeline(scraper: TokenMetadataScraper)
+                            (implicit spark: SparkSession, loggerFactory: LoggerContext, ioHandler: IOHandler) {
+  private lazy val logger: Logger = loggerFactory.getLogger(this.getClass)
+
   private def createProcessedDs(events: Dataset[TokenTransferEvent], tokenMetadata: Dataset[TokenMetadata],
                                 blocksInfo: Dataset[BlockInfo]): Dataset[ProcessedTokenTransaction] = {
     val joinedWithMeta = events
-      .joinWith(tokenMetadata, F.lower(tokenMetadata("address")) equalTo F.lower(F.hex(events("contractAddress"))), "left")
+      .joinWith(F.broadcast(tokenMetadata), F.lower(tokenMetadata("address")) equalTo F.lower(F.hex(events("contractAddress"))), "left")
     joinedWithMeta
       .joinWith(blocksInfo, blocksInfo("number") equalTo joinedWithMeta("_1.blockNumber"), "left")
       .map {
         case ((event, metadata), blockInfo) =>
+          val tokenDecimals = Option(metadata).flatMap(_.decimals).map(Math.max(_, 3)).getOrElse(18)
+          val decimalPrecision = Math.min(tokenDecimals, EthereumTokensPipeline.decimalPrecisionForValues)
           ProcessedTokenTransaction(
             event.contractAddress.hex,
             event.blockNumber,
             event.fromAddress.hex,
             event.toAddress.hex,
-            ByteArrayUtil.convertByteArrayToDouble(event.value, Option(metadata).flatMap(_.decimals).getOrElse(18), 3),
+            ByteArrayUtil.convertByteArrayToDouble(event.value, tokenDecimals - 3, decimalPrecision),
             event.transactionHash.hex,
             event.transactionIndex,
             blockInfo.timestamp)
@@ -53,32 +63,43 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper, ioHandler: IOHandler
       .as[Array[Byte]]
       .map(_.hex.toLowerCase)
       .distinct
-      .except(metadataDs.select("address").as[String].map(_.toLowerCase))
+      .except(F.broadcast(metadataDs).select("address").as[String].map(_.toLowerCase))
       .collect()
+
+    logger.info(s"Found ${missingContracts.length} missing contract metadatas")
 
     val newMetadata =
       missingContracts
-        .map(scraper.scrapeAddress)
-        .map(_.map(Option.apply).recover {
-          case _ => None
-        })
-        .flatMap(Await.result(_, 1 minute))
-
-    val newMetadataDs = spark
-      .createDataset(newMetadata)
-
-    newMetadataDs
-      .filter((metadata: TokenMetadata)=> {
+        .flatMap {
+          address =>
+            logger.debug(s"Scraping $address")
+            val eventualResult = scraper.scrapeAddress(address)
+              .map(Option.apply)
+              .recover {
+                case _ => None
+              }
+            val result = Await.result(eventualResult, 1 minute)
+            logger.debug("Done")
+            result
+        }
+        .filter((metadata: TokenMetadata) => {
           val symbolAndDecimalsAreOk = for {
             s <- metadata.symbol
             _ <- metadata.decimals
           } yield !s.isEmpty
 
           symbolAndDecimalsAreOk.getOrElse(false)
-      })
+        })
+
+    logger.debug(s"Found ${newMetadata.length} new contract metadatas")
+
+    val newMetadataDs = spark
+      .createDataset(newMetadata)
+
+    newMetadataDs
       .write
       .mode(SaveMode.Append)
-      .parquet(config.metadataPath)
+      .parquet(config.metadataCachePath)
 
     metadataDs.union(newMetadataDs)
   }
@@ -108,10 +129,15 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper, ioHandler: IOHandler
     val metadataDs = spark
       .read
       .schema(TokenMetadata.encoder.schema)
-      .parquet(config.metadataPath)
+      .parquet(config.metadataCachePath)
       .as[TokenMetadata]
 
     val updatedMetadata = scrapeMissingMetadata(config, parsedEvents, metadataDs)
+
+    updatedMetadata
+      .write
+      .mode(SaveMode.Overwrite)
+      .parquet(config.metadataOutputPath)
 
     val newBlockHeaders = spark
       .read
@@ -126,4 +152,26 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper, ioHandler: IOHandler
       .mode(SaveMode.Append)
       .parquet(config.output)
   }
+}
+
+object EthereumTokensPipeline {
+  val decimalPrecisionForValues: Int = 3
+}
+
+trait EthereumTokenPipelineComponent {
+  this: LoggingComponent with SparkSessionComponent with IOHandlerComponent =>
+
+  private val scraper = {
+    implicit val actorSystem: ActorSystem = ActorSystem()
+    val web3j = Web3j.build(new HttpService(s"http://geth.endorians.com:8545/"))
+    new CachedTokenMetadataScraper(
+      new CompositeTokenMetadataScraper(
+        new Web3TokenMetadataScraper(web3j),
+        new EthplorerTokenMetadataScraper("freekey"),
+        new EtherscanTokenMetadataScraper()
+      )
+    )
+  }
+
+  val driver: EthereumTokensPipeline = new EthereumTokensPipeline(scraper)
 }

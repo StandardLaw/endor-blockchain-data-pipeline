@@ -1,0 +1,336 @@
+POST https://development.endorians.com:3333/blueprints/create
+Content-Type: application/json
+
+{
+    "args": {
+        "batchId": "my_batch",
+        "jarPath": "s3://endor-public/pipeline.jar",
+        "customerId": "x",
+        "facadeHost": "development.endorians.com",
+        "logicalDate": "2018-01-17",
+        "token": "",
+        "clusterSetName": "developmentEMR"
+    },
+    "metadata": {
+        "type": "integration-ethereum",
+        "customer": "ethereum"
+    },
+    "jobs": {
+        "fetchTokenRates": {
+            "jobType": "emr_ethereumTokenRatesPipeline",
+            "body": {
+                "config":{
+                    "metadataPath": "s3://endor-blockchains/ethereum/logs/metadata/",
+                    "lastFetchedPath": "endor-blockchains/ethereum/logs/lastFetchedRatesOn",
+                    "output": "s3://source-erc20-tokens/rates/Inbox/"
+                },
+                "env": {
+                    "spark": {
+                        "additionalConfiguration": [],
+                        "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
+                        "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
+                        "jarPath": "${jarPath}",
+                        "isPrimary": true
+                    }
+                }
+            }
+        },
+        "moveLogsInboxToInProgress": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "newPrefix": "ethereum/logs/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "oldPrefix": "ethereum/logs/Inbox/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveLogsToInbox",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "moveBlocksInboxToInProgress": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "newPrefix": "ethereum/blocks/InProgress/${batchId}/",
+                    "destinationBucket": "endor-blockchains",
+                    "oldPrefix": "ethereum/blocks/Inbox/",
+                    "sourceBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveBlocksToInProgress",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "parseEthereumTransactions": {
+            "jobType": "emr_ethereumTransactionsPipeline",
+            "body": {
+                "config":{
+                    "input": "s3://endor-blockchains/ethereum/blocks/InProgress/${batchId}/",
+                    "output": "s3://source-ethereum/TransactionsNew/Inbox/"
+                },
+                "env": {
+                    "spark": {
+                        "additionalConfiguration": [
+                            ["spark.files.maxPartitionBytes", "1"]
+                        ],
+                        "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
+                        "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
+                        "jarPath": "${jarPath}",
+                        "isPrimary": true
+                    }
+                }
+            }
+        },
+        "moveBlocksInProgressToInbox_parseEthereumTransactions": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "oldPrefix": "ethereum/blocks/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "newPrefix": "ethereum/blocks/Inbox/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveBlocksToInbox",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "parseEthereumBlockHeaders": {
+            "jobType": "emr_ethereumBlocksPipeline",
+            "body": {
+                "config":{
+                    "input": "s3://endor-blockchains/ethereum/blocks/InProgress/${batchId}/",
+                    "output": "s3://endor-blockchains/ethereum/blocks/headers/${batchId}/"
+                },
+                "env": {
+                    "spark": {
+                        "additionalConfiguration": [],
+                        "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
+                        "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
+                        "jarPath": "${jarPath}",
+                        "isPrimary": true
+                    }
+                }
+            }
+        },
+        "parseEthereumTokenTransactions": {
+            "jobType": "emr_ethereumTokensPipeline",
+            "body": {
+                "config":{
+                    "input": "s3://endor-blockchains/ethereum/logs/InProgress/${batchId}/",
+                    "blocksInput": "s3://endor-blockchains/ethereum/blocks/headers/${batchId}/",
+                    "metadataCachePath": "s3://endor-blockchains/ethereum/logs/metadata/",
+                    "metadataOutputPath": "s3://source-ethereum-tokens/TokenMetadata/Inbox/",
+                    "output": "s3://source-ethereum-tokens/TransactionsNew/Inbox/"
+                },
+                "env": {
+                    "spark": {
+                        "additionalConfiguration": [],
+                        "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
+                        "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
+                        "jarPath": "${jarPath}",
+                        "isPrimary": true
+                    }
+                }
+            }
+        },
+        "moveBlocksInProgressToInbox_parseEthereumBlockHeaders": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "oldPrefix": "ethereum/blocks/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "newPrefix": "ethereum/blocks/Inbox/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveBlocksToInbox",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "moveBlocksInProgressToArchive": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "oldPrefix": "ethereum/blocks/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "newPrefix": "ethereum/blocks/Archive/${batchId}/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveBlocksToArchive",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "moveLogsInProgressToInbox_parseEthereumTokenTransactions": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "oldPrefix": "ethereum/logs/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "newPrefix": "ethereum/logs/Inbox/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveLogsToInbox",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "moveLogsInProgressToArchive": {
+            "jobType": "s3Move",
+            "body": {
+                "config": {
+                    "oldPrefix": "ethereum/logs/InProgress/${batchId}/",
+                    "sourceBucket": "endor-blockchains",
+                    "newPrefix": "ethereum/logs/Archive/${batchId}/",
+                    "destinationBucket": "endor-blockchains"
+                },
+                "metadata": {
+                    "sub_operation": "moveLogsToArchive",
+                    "operation": "onboarding",
+                    "customer": "ethereum"
+                },
+                "env": {
+                    "s3": {},
+                    "spark": {
+                        "cluster_id": "",
+                        "clusterKey": "spark.production"
+                    },
+                    "featureFlags": {
+                        "io": "s3"
+                    },
+                    "envConfig": {
+                        "s3": {}
+                    }
+                }
+            }
+        },
+        "onboardAll": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${token}"
+            }
+        },
+        "onboardAllPolling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${customerId}",
+                "token": "Key ${token}",
+                "taskId": "${taskId}"
+            }
+        }
+    },
+    "dependencies": [
+        {"origin": "moveBlocksInboxToInProgress", "destination": "parseEthereumTransactions"},
+        {"origin": "parseEthereumTransactions", "destination": "moveBlocksInProgressToInbox_parseEthereumTransactions", "type": "fail"},
+        {"origin": "parseEthereumTransactions", "destination": "parseEthereumBlockHeaders"},
+        {"origin": "parseEthereumBlockHeaders", "destination": "moveBlocksInProgressToInbox_parseEthereumBlockHeaders", "type": "fail"},
+        {"origin": "parseEthereumBlockHeaders", "destination": "moveBlocksInProgressToArchive"},
+        {"origin": "parseEthereumBlockHeaders", "destination": "parseEthereumTokenTransactions"},
+        {"origin": "moveLogsInboxToInProgress", "destination": "parseEthereumTokenTransactions"},
+        {"origin": "parseEthereumTokenTransactions", "destination": "moveLogsInProgressToInbox_parseEthereumTokenTransactions", "type": "fail"},
+        {"origin": "parseEthereumTokenTransactions", "destination": "moveLogsInProgressToArchive"},
+        {"origin": "fetchTokenRates", "destination": "onboardAll"},
+        {"origin": "parseEthereumTransactions", "destination": "onboardAll"},
+        {"origin": "parseEthereumTokenTransactions", "destination": "onboardAll"},
+        {"origin": "onboardAll", "destination": "onboardAllPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]}
+    ]
+}
+
+###

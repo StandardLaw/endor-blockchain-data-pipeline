@@ -26,13 +26,15 @@ class EthereumTransactionsPipeline(ioHandler: IOHandler)(implicit spark: SparkSe
           val blockNumber = block.ethereumBlockHeader.number
           block.ethereumTransactions
             .map(_.toEnriched)
-            .map {
+            .flatMap {
               transaction =>
-                ProcessedTransaction(blockTime, blockNumber, transaction.nonce.hex,
+                val original = ProcessedTransaction(blockTime, blockNumber, transaction.nonce.hex,
                   ByteArrayUtil.convertByteArrayToDouble(transaction.value, 15, 3), transaction.sendAddress.hex,
                   transaction.receiveAddress.hex, transaction.gasPrice, transaction.gasLimit,
                   transaction.data.map(_.hex), transaction.hash.hex,
                   transaction.contractAddress.map(_.hex))
+                Seq(original, original.copy(sendAddress = original.receiveAddress,
+                  receiveAddress = original.sendAddress, value = original.value * -1))
             }
       }
   }

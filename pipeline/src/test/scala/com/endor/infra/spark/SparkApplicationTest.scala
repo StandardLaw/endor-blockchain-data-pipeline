@@ -37,9 +37,9 @@ class SparkApplicationTest extends SharedSQLContext {
       """{
         |    "arg": {
         |        "applicationConf": {
-        |            "output": "s3://source-ethereum-tokens/rates/Inbox/",
+        |            "output": "/home/user/Desktop/testStream/out/",
         |            "lastFetchedPath": "endor-blockchains/ethereum/logs/lastFetchedRatesOn",
-        |            "metadataPath": "s3://endor-blockchains/ethereum/logs/metadata/"
+        |            "metadataPath": "/home/user/Desktop/testStream/metadata/"
         |        },
         |        "featureFlags": {
         |            "debugQueryBuilder": false,
@@ -49,7 +49,7 @@ class SparkApplicationTest extends SharedSQLContext {
         |            "multiChannelPubSub": true
         |        }
         |    },
-        |    "jarPath": "${jarPath}",
+        |    "jarPath": "",
         |    "classFqdn": "com.endor.blockchain.ethereum.tokens.EMREthereumTokenRates",
         |    "jobnikSession": null,
         |    "additionalSparkConf": {},
