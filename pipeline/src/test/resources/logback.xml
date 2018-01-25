@@ -3,12 +3,13 @@
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <pattern>%-4relative [%thread] %-5level %logger{35} - %msg %n</pattern>
         </encoder>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
-        </filter>
     </appender>
 
-    <root>
+    <logger name="com.endor" level="debug">
+        <appender-ref ref="ConsoleAppender"/>
+    </logger>
+
+    <root level="WARN">
         <appender-ref ref="ConsoleAppender"/>
     </root>
 </configuration>

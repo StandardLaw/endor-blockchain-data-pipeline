@@ -133,7 +133,7 @@ lazy val pipeline = project.in(file("pipeline"))
     "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "provided,test",
     "com.amazonaws"                 % "aws-java-sdk"                 % emrProvidedAwsSdkVersion  % "provided,test",
     "org.apache.hadoop"             % "hadoop-aws"                   % emrProvidedHadoopVersion  % "provided,test",
-    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "8d9afa423d0356cc26a5f7547d0b29e07772738f",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "d473ce9551d3519c8f0f84c631291cb501815b5f",
     "net.debasishg"                %% "redisclient"                  % "3.4",
     "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
     "io.logz.logback"               % "logzio-logback-appender"      % "1.0.17"              exclude("com.google.guava", "guava"),

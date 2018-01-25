@@ -25,21 +25,23 @@ class SparkApplicationTest extends SharedSQLContext {
     val className = (json \ "classFqdn").as[String]
     val application = Class.forName(className, true, this.getClass.getClassLoader)
     val mainMethod = application.getMethod("main", new Array[String](0).getClass)
-    mainMethod.invoke(null, Array("runDriver",
+    mainMethod.invoke(null, Array("debugDriver",
       (json \ "jobnikSession").asOpt[JsObject].map(_.toString).getOrElse("null"),
       diConfigurationJson.toString,
       (json \ "arg").as[JsObject].toString
     ))
   }
 
-  ignore("debug") {
+  test("debug") {
     val json = Json.parse(
       """{
         |    "arg": {
         |        "applicationConf": {
-        |            "output": "/home/user/Desktop/testStream/out/",
-        |            "lastFetchedPath": "endor-blockchains/ethereum/logs/lastFetchedRatesOn",
-        |            "metadataPath": "/home/user/Desktop/testStream/metadata/"
+        |            "output": "/home/user/Desktop/testStream/output/",
+        |            "metadataOutputPath": "/home/user/Desktop/testStream/metadata_out/",
+        |            "metadataCachePath": "/home/user/Desktop/testStream/metadata/",
+        |            "blocksInput": "/home/user/Desktop/testStream/blocks/",
+        |            "input": "/home/user/Desktop/testStream/logs/"
         |        },
         |        "featureFlags": {
         |            "debugQueryBuilder": false,
@@ -50,7 +52,7 @@ class SparkApplicationTest extends SharedSQLContext {
         |        }
         |    },
         |    "jarPath": "",
-        |    "classFqdn": "com.endor.blockchain.ethereum.tokens.EMREthereumTokenRates",
+        |    "classFqdn": "com.endor.blockchain.ethereum.tokens.EMRTokensPipeline",
         |    "jobnikSession": null,
         |    "additionalSparkConf": {},
         |    "diConfiguration": {

@@ -22,7 +22,7 @@ class EthereumTransactionsPipeline(ioHandler: IOHandler)(implicit spark: SparkSe
     rawEthereum
       .flatMap {
         block =>
-          val blockTime = new Timestamp(block.ethereumBlockHeader.timestamp)
+          val blockTime = new Timestamp(block.ethereumBlockHeader.timestamp * 1000)
           val blockNumber = block.ethereumBlockHeader.number
           block.ethereumTransactions
             .map(_.toEnriched)

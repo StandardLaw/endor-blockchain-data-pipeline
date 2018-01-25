@@ -65,14 +65,16 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
       .distinct
       .except(F.broadcast(metadataDs).select("address").as[String].map(_.toLowerCase))
       .collect()
+      .toSeq
 
     logger.info(s"Found ${missingContracts.length} missing contract metadatas")
 
     val newMetadata =
       missingContracts
+        .zipWithIndex
         .flatMap {
-          address =>
-            logger.debug(s"Scraping $address")
+          case (address, idx)=>
+            logger.info(s"Scraping $address - $idx / ${missingContracts.length}")
             val eventualResult = scraper.scrapeAddress(address)
               .map(Option.apply)
               .recover {
@@ -82,21 +84,21 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
             logger.debug("Done")
             result
         }
-        .filter((metadata: TokenMetadata) => {
-          val symbolAndDecimalsAreOk = for {
-            s <- metadata.symbol
-            _ <- metadata.decimals
-          } yield !s.isEmpty
 
-          symbolAndDecimalsAreOk.getOrElse(false)
-        })
-
-    logger.debug(s"Found ${newMetadata.length} new contract metadatas")
+    logger.info(s"Found ${newMetadata.length} new contract metadatas")
 
     val newMetadataDs = spark
       .createDataset(newMetadata)
 
     newMetadataDs
+      .filter((metadata: TokenMetadata) => {
+        val symbolAndDecimalsAreOk = for {
+          s <- metadata.symbol
+          _ <- metadata.decimals
+        } yield !s.isEmpty
+
+        symbolAndDecimalsAreOk.getOrElse(false)
+      })
       .write
       .mode(SaveMode.Append)
       .parquet(config.metadataCachePath)
@@ -135,6 +137,7 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
     val updatedMetadata = scrapeMissingMetadata(config, parsedEvents, metadataDs)
 
     updatedMetadata
+      .filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty))
       .write
       .mode(SaveMode.Overwrite)
       .parquet(config.metadataOutputPath)

@@ -48,48 +48,50 @@ abstract class SparkApplication[T: Reads] {
 
   final def main(args: Array[String]): Unit = {
     args(0) match {
-      case "testConfiguration" =>
-        println(parseConfiguration(args(3)))
+      case "testConfiguration" => println(parseConfiguration(args(3)))
+      case "runDriver" => runDriver(args, testMode = false)
+      case "debugDriver" => runDriver(args, testMode = true)
+    }
+  }
 
-      case "runDriver" =>
-        implicit val maybeJobnikSession: Option[JobnikSession] = parseToJsValue(args(1)).asOpt[JobnikSession]
-        val diConf: DIConfiguration = parseToJsValue(args(2)).as[DIConfiguration]
-        implicit val jobnikContainer: JobnikContainer = {
-          val loggerFactory: LoggerContext = {
-            val loggerContext = new LoggerContext()
-            val contextInitializer = new ContextInitializer(loggerContext)
-            contextInitializer.autoConfig()
-            loggerContext
-          }
-          JobnikContainer(diConf, loggerFactory)
+  private def runDriver(args: Array[String], testMode: Boolean): Unit = {
+    implicit val maybeJobnikSession: Option[JobnikSession] = parseToJsValue(args(1)).asOpt[JobnikSession]
+    val diConf: DIConfiguration = parseToJsValue(args(2)).as[DIConfiguration]
+    implicit val jobnikContainer: JobnikContainer = {
+      val loggerFactory: LoggerContext = {
+        val loggerContext = new LoggerContext()
+        val contextInitializer = new ContextInitializer(loggerContext)
+        contextInitializer.autoConfig()
+        loggerContext
+      }
+      JobnikContainer(diConf, loggerFactory)
+    }
+
+    val jobAborted = for {
+      jobnikSession <- maybeJobnikSession
+      redisMode <- diConf.redisMode
+      jobId <- jobnikSession.jobToken.as[Map[String, String]].get("jobId")
+      jobRole = jobnikSession.jobnikRole
+      tasksRedis = redisMode.tasks(jobnikSession)
+    } yield tasksRedis.exists(s"$jobRole-$jobId-aborted-job")
+
+    // If we don't have jobnik or redis, assume the job is not aborted
+    Jobnik.monitor("sparkDriver", 2, 2) {
+      val configuration = parseConfiguration(args(3))
+      val entryPointConfig = createEntryPointConfig(configuration)
+
+      // We have to initialize a SparkSession because yarn.ApplicationMaster expects
+      // one to be initialized in every app
+      val spark = SparkSession.builder()
+        .appName(entryPointConfig.operation)
+        .getOrCreate()
+
+      if (!jobAborted.getOrElse(false)) {
+        implicit val endorContext: Context = Context(testMode = testMode)
+        spark.withContext(entryPointConfig) {
+          run(spark, configuration.applicationConf)
         }
-
-        val jobAborted = for {
-          jobnikSession <- maybeJobnikSession
-          redisMode <- diConf.redisMode
-          jobId <- jobnikSession.jobToken.as[Map[String, String]].get("jobId")
-          jobRole = jobnikSession.jobnikRole
-          tasksRedis = redisMode.tasks(jobnikSession)
-        } yield tasksRedis.exists(s"$jobRole-$jobId-aborted-job")
-
-        // If we don't have jobnik or redis, assume the job is not aborted
-        Jobnik.monitor("sparkDriver", 2, 2) {
-          val configuration = parseConfiguration(args(3))
-          val entryPointConfig = createEntryPointConfig(configuration)
-
-          // We have to initialize a SparkSession because yarn.ApplicationMaster expects
-          // one to be initialized in every app
-          val spark = SparkSession.builder()
-            .appName(entryPointConfig.operation)
-            .getOrCreate()
-
-          if (!jobAborted.getOrElse(false)) {
-            implicit val endorContext: Context = Context()
-            spark.withContext(entryPointConfig) {
-              run(spark, configuration.applicationConf)
-            }
-          }
-        }
+      }
     }
   }
 }

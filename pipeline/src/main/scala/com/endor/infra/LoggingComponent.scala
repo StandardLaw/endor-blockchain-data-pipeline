@@ -3,7 +3,7 @@ package com.endor.infra
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.util.ContextInitializer
 
-object LoggingComponent {
+object LoggingComponent extends Specializable {
   lazy val inMemoryLoggerFactory: LoggerContext = {
     val loggerContext = new LoggerContext()
     val contextInitializer = new ContextInitializer(loggerContext)
@@ -13,7 +13,7 @@ object LoggingComponent {
   }
 }
 
-trait LoggingComponent {
+trait LoggingComponent extends Serializable {
   implicit lazy val loggerFactory: LoggerContext = {
     val loggerContext = new LoggerContext()
     val contextInitializer = new ContextInitializer(loggerContext)

@@ -3,7 +3,7 @@ Content-Type: application/json
 
 {
     "args": {
-        "batchId": "my_batch",
+        "batchId": "my_batch_5",
         "jarPath": "s3://endor-public/pipeline.jar",
         "customerId": "x",
         "facadeHost": "development.endorians.com",
@@ -167,8 +167,8 @@ Content-Type: application/json
                     "input": "s3://endor-blockchains/ethereum/logs/InProgress/${batchId}/",
                     "blocksInput": "s3://endor-blockchains/ethereum/blocks/headers/${batchId}/",
                     "metadataCachePath": "s3://endor-blockchains/ethereum/logs/metadata/",
-                    "metadataOutputPath": "s3://source-ethereum-tokens/TokenMetadata/Inbox/",
-                    "output": "s3://source-ethereum-tokens/TransactionsNew/Inbox/"
+                    "metadataOutputPath": "s3://source-erc20-tokens/meta/Inbox/",
+                    "output": "s3://source-erc20-tokens/transactions/Inbox/"
                 },
                 "env": {
                     "spark": {
