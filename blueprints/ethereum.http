@@ -151,7 +151,9 @@ Content-Type: application/json
                 },
                 "env": {
                     "spark": {
-                        "additionalConfiguration": [],
+                        "additionalConfiguration": [
+                                                    ["spark.files.maxPartitionBytes", "1"]
+                                                ],
                         "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
                         "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
                         "jarPath": "${jarPath}",
