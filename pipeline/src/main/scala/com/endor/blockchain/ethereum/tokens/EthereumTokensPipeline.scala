@@ -93,9 +93,10 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
     newMetadataDs
       .filter((metadata: TokenMetadata) => {
         val symbolAndDecimalsAreOk = for {
+          n <- metadata.name
           s <- metadata.symbol
           _ <- metadata.decimals
-        } yield !s.isEmpty
+        } yield !n.isEmpty && !s.isEmpty
 
         symbolAndDecimalsAreOk.getOrElse(false)
       })
