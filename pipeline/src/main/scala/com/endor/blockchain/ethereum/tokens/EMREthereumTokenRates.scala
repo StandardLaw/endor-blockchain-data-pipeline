@@ -9,7 +9,7 @@ import org.apache.spark.sql.SparkSession
 
 object EMREthereumTokenRates extends SparkApplication[EthereumTokenRatesPipelineConfig] {
   override protected def createEntryPointConfig(configuration: SparkEntryPointConfiguration[EthereumTokenRatesPipelineConfig]): EntryPointConfig =
-    EntryPointConfig("EthereumBlocksToTokenTransactions")
+    EntryPointConfig("EtheruemTokenRates")
 
 
   override protected def run(sparkSession: SparkSession, configuration: EthereumTokenRatesPipelineConfig)

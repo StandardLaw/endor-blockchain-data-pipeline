@@ -1,15 +1,17 @@
-POST https://development.endorians.com:3333/blueprints/create
+POST https://pilots.endorians.com:3333/blueprints/create
 Content-Type: application/json
 
 {
     "args": {
-        "batchId": "my_batch_5",
+        "batchId": "my_batch_7",
         "jarPath": "s3://endor-public/pipeline.jar",
-        "customerId": "x",
-        "facadeHost": "development.endorians.com",
-        "logicalDate": "2018-01-17",
-        "token": "",
-        "clusterSetName": "developmentEMR"
+        "ethereumCustomerId": "5a2421f0e521347a7c7b92b8",
+        "tokensCustomerId": "5a5e576dc78caa347f4a140c",
+        "facadeHost": "localhost",
+        "logicalDate": "2018-01-29",
+        "ethereumToken": "cdM3rwOXgXdq1hafcbTWmnvAya1Sa6z4KHfbxy/r",
+        "erc20Token": "bPVPDNbUn1WzOiPQcgkEhorksFN83XJC62OziXBA",
+        "clusterSetName": "productionClusterSet"
     },
     "metadata": {
         "type": "integration-ethereum",
@@ -113,6 +115,25 @@ Content-Type: application/json
                 }
             }
         },
+        "onboardEthereumTransactions": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${ethereumCustomerId}",
+                "dataschemeIds": ["5a65f51dc78caa347f4a395e"],
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${ethereumToken}"
+            }
+        },
+        "onboardEthereumTransactionsPolling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${ethereumCustomerId}",
+                "token": "Key ${ethereumToken}",
+                "taskId": "${taskId}"
+            }
+        },
         "moveBlocksInProgressToInbox_parseEthereumTransactions": {
             "jobType": "s3Move",
             "body": {
@@ -169,7 +190,7 @@ Content-Type: application/json
                     "input": "s3://endor-blockchains/ethereum/logs/InProgress/${batchId}/",
                     "blocksInput": "s3://endor-blockchains/ethereum/blocks/headers/${batchId}/",
                     "metadataCachePath": "s3://endor-blockchains/ethereum/logs/metadata/",
-                    "metadataOutputPath": "s3://source-erc20-tokens/meta/Inbox/",
+                    "metadataOutputPath": "s3://source-erc20-tokens/meta_meta/Inbox/",
                     "output": "s3://source-erc20-tokens/transactions/Inbox/"
                 },
                 "env": {
@@ -303,17 +324,17 @@ Content-Type: application/json
             "jobType": "onboard",
             "body": {
                 "facadeHost": "${facadeHost}",
-                "customerId": "${customerId}",
+                "customerId": "${tokensCustomerId}",
                 "logicalDateTime": "${logicalDate}T00:00:00Z",
-                "token": "Key ${token}"
+                "token": "Key ${erc20Token}"
             }
         },
         "onboardAllPolling": {
             "jobType": "endorTaskStatusPolling",
             "body": {
                 "facadeHost": "${facadeHost}",
-                "customerId": "${customerId}",
-                "token": "Key ${token}",
+                "customerId": "${tokensCustomerId}",
+                "token": "Key ${erc20Token}",
                 "taskId": "${taskId}"
             }
         }
@@ -331,7 +352,9 @@ Content-Type: application/json
         {"origin": "fetchTokenRates", "destination": "onboardAll"},
         {"origin": "parseEthereumTransactions", "destination": "onboardAll"},
         {"origin": "parseEthereumTokenTransactions", "destination": "onboardAll"},
-        {"origin": "onboardAll", "destination": "onboardAllPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]}
+        {"origin": "onboardAll", "destination": "onboardAllPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]},
+        {"origin": "moveBlocksInProgressToArchive", "destination": "onboardEthereumTransactions"},
+        {"origin": "onboardEthereumTransactions", "destination": "onboardEthereumTransactionsPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]}
     ]
 }
 
