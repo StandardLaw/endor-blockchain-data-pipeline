@@ -1,20 +1,19 @@
 package com.endor.blockchain.ethereum.tokens
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-
-import akka.actor.ActorSystem
-import com.endor.spark.blockchain.ethereum.token.TokenRatesFetcher
-import com.endor.spark.blockchain.ethereum.token.metadata.TokenMetadata
 import com.endor.storage.io.IOHandler
-import org.apache.spark.sql.{SaveMode, SparkSession}
-import play.api.libs.json.{OFormat, Json}
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.DataTypes
+import play.api.libs.json.{Json, OFormat}
 
-import scala.concurrent.{Await, ExecutionContext}
-import scala.concurrent.duration._
-import scala.io.Source
+final case class RateRow(rateName: String, rateSymbol: String, price: Double, metaName: Option[String],
+                         metaSymbol: Option[String], address: Option[String], timestamp: java.sql.Timestamp)
 
-final case class EthereumTokenRatesPipelineConfig(metadataPath: String, lastFetchedPath: String, output: String)
+object RateRow {
+  implicit val encoder: Encoder[RateRow] = Encoders.product[RateRow]
+}
+
+final case class EthereumTokenRatesPipelineConfig(inputPath: String, metadataPath: String, output: String)
 
 object EthereumTokenRatesPipelineConfig {
   implicit val format: OFormat[EthereumTokenRatesPipelineConfig] = Json.format[EthereumTokenRatesPipelineConfig]
@@ -23,40 +22,35 @@ object EthereumTokenRatesPipelineConfig {
 class EthereumTokenRatesPipeline(ioHandler: IOHandler)
                                 (implicit spark: SparkSession){
   def run(config: EthereumTokenRatesPipelineConfig): Unit = {
-    val lastFetchedDate = ioHandler
-      .listFiles(ioHandler.extractPathFromFullURI(config.lastFetchedPath))
-      .headOption
-      .map(_.key)
-      .map(ioHandler.loadRawData)
-      .map(Source.fromInputStream)
-      .map(_.mkString.trim)
-      .map(Instant.parse)
-      .getOrElse(Instant.parse("1970-01-01T00:00:00Z"))
-      .truncatedTo(ChronoUnit.DAYS)
-    val today = Instant.now().truncatedTo(ChronoUnit.DAYS)
-    if (lastFetchedDate isBefore today) {
-      import spark.implicits._
-
-      spark.read
-        .schema(TokenMetadata.encoder.schema)
-        .parquet(config.metadataPath)
-        .as[TokenMetadata]
-        .select("symbol")
-        .where($"symbol" isNotNull)
-        .distinct()
-        .as[String]
-        .mapPartitions {
-          it =>
-            implicit val system: ActorSystem = ActorSystem()
-            implicit val ec: ExecutionContext = ExecutionContext.global
-            val fetcher = new TokenRatesFetcher()(system)
-            it
-              .flatMap(symbol => Await.result(fetcher.fetchRate(symbol), 1 minute))
-        }
-        .write
-        .mode(SaveMode.Append)
-        .parquet(config.output)
-      ioHandler.saveRawData(today.toString, config.lastFetchedPath)
+    if(ioHandler.getDataSize(config.inputPath) > 0) {
+      val result =process(config)
+      result.write.mode(SaveMode.Append).parquet(config.output)
     }
+  }
+
+  private[tokens] def process(config: EthereumTokenRatesPipelineConfig): Dataset[RateRow] = {
+    import spark.implicits._
+    val metadata = spark.read.parquet(config.metadataPath)
+      .select(
+        $"name" as "metaName",
+        $"symbol" as "metaSymbol",
+        $"address"
+      )
+    val rawRates = spark.read
+      .json(config.inputPath)
+      .where($"price_usd" isNotNull)
+      .select(
+        $"name" as "rateName",
+        $"symbol" as "rateSymbol",
+        $"price_usd" cast DataTypes.DoubleType as "price",
+        $"last_updated" cast DataTypes.LongType cast DataTypes.TimestampType as "timestamp"
+      )
+    val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
+    val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
+    val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
+    rawRates
+      .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
+      .na.fill("n-a")
+      .as[RateRow]
   }
 }

@@ -32,16 +32,13 @@ class SparkApplicationTest extends SharedSQLContext {
     ))
   }
 
-  test("debug") {
+  ignore("debug") {
     val json = Json.parse(
       """{
         |    "arg": {
         |        "applicationConf": {
-        |            "output": "/home/user/Desktop/testStream/output/",
-        |            "metadataOutputPath": "/home/user/Desktop/testStream/metadata_out/",
-        |            "metadataCachePath": "/home/user/Desktop/testStream/metadata/",
-        |            "blocksInput": "/home/user/Desktop/testStream/blocks/",
-        |            "input": "/home/user/Desktop/testStream/logs/"
+        |            "output": "s3://source-ethereum/TransactionsNew/Inbox/",
+        |            "input": "s3://endor-blockchains/ethereum/blocks/InProgress//"
         |        },
         |        "featureFlags": {
         |            "debugQueryBuilder": false,
@@ -52,9 +49,11 @@ class SparkApplicationTest extends SharedSQLContext {
         |        }
         |    },
         |    "jarPath": "",
-        |    "classFqdn": "com.endor.blockchain.ethereum.tokens.EMRTokensPipeline",
+        |    "classFqdn": "com.endor.blockchain.ethereum.transaction.EMRTransactionsPipeline",
         |    "jobnikSession": null,
-        |    "additionalSparkConf": {},
+        |    "additionalSparkConf": {
+        |        "spark.files.maxPartitionBytes": "1"
+        |    },
         |    "diConfiguration": {
         |        "artifactPublishers": {
         |            "typeName": "Real"
