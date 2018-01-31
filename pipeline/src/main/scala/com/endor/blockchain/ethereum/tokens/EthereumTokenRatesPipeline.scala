@@ -43,6 +43,7 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
         $"name" as "rateName",
         $"symbol" as "rateSymbol",
         $"price_usd" cast DataTypes.DoubleType as "price",
+        $"market_cap_usd" cast DataTypes.DoubleType as "marketCap",
         $"last_updated" cast DataTypes.LongType cast DataTypes.TimestampType as "timestamp"
       )
     val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")

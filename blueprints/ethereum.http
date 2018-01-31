@@ -3,7 +3,7 @@ Content-Type: application/json
 
 {
     "args": {
-        "batchId": "my_batch_8",
+        "batchId": "my_batch_9",
         "jarPath": "s3://endor-public/pipeline.jar",
         "ethereumCustomerId": "5a2421f0e521347a7c7b92b8",
         "tokensCustomerId": "5a5e576dc78caa347f4a140c",
@@ -308,6 +308,44 @@ Content-Type: application/json
                 "token": "Key ${erc20Token}",
                 "taskId": "${taskId}"
             }
+        },
+        "aggregateTokenRates": {
+            "jobType": "emr_ethereumTokenRatesAggregationDriver",
+            "body": {
+                "config":{
+                    "ratesFactsPath": "s3://sandbox-erc20-tokens/OnBoarding/ratesFacts/data-parquet/",
+                    "ratesSnapshotPath": "s3://sandbox-erc20-tokens/OnBoarding/ratesSnapshot/data-parquet/",
+                    "outputPath": "s3://source-erc20-tokens/ratesAgg/Inbox/"
+                },
+                "env": {
+                    "spark": {
+                        "additionalConfiguration": [],
+                        "destinationEMRHost": "emr.${clusterSetName}-fast.endorians.com",
+                        "destinationEMRQueue": "emr-${clusterSetName}-fast-tasks",
+                        "jarPath": "${jarPath}",
+                        "isPrimary": true
+                    }
+                }
+            }
+        },
+        "onboardAggregatedRates": {
+            "jobType": "onboard",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${tokensCustomerId}",
+                "dataschemeIds": ["5a71acbd7feb7a12514073b4"],
+                "logicalDateTime": "${logicalDate}T00:00:00Z",
+                "token": "Key ${erc20Token}"
+            }
+        },
+        "onboardAggregatedRatesPolling": {
+            "jobType": "endorTaskStatusPolling",
+            "body": {
+                "facadeHost": "${facadeHost}",
+                "customerId": "${tokensCustomerId}",
+                "token": "Key ${erc20Token}",
+                "taskId": "${taskId}"
+            }
         }
     },
     "dependencies": [
@@ -325,7 +363,10 @@ Content-Type: application/json
         {"origin": "parseEthereumTokenTransactions", "destination": "onboardAll"},
         {"origin": "onboardAll", "destination": "onboardAllPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]},
         {"origin": "moveBlocksInProgressToArchive", "destination": "onboardEthereumTransactions"},
-        {"origin": "onboardEthereumTransactions", "destination": "onboardEthereumTransactionsPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]}
+        {"origin": "onboardEthereumTransactions", "destination": "onboardEthereumTransactionsPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]},
+        {"origin": "onboardAllPolling", "destination": "aggregateTokenRates"},
+        {"origin": "aggregateTokenRates", "destination": "onboardAggregatedRates"},
+        {"origin": "onboardAggregatedRates", "destination": "onboardAggregatedRatesPolling", "symbols": [{"symbolName": "taskId", "fieldPath": "taskId"}]}
     ]
 }
 
