@@ -138,6 +138,7 @@ lazy val pipeline = project.in(file("pipeline"))
     "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
     "io.logz.logback"               % "logzio-logback-appender"      % "1.0.17"              exclude("com.google.guava", "guava"),
     "ch.qos.logback"                % "logback-classic"              % "1.2.3",
+    "net.ruippeixotog"             %% "scala-scraper"                % "2.0.0",
 
     "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "test" classifier "tests",
     "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "test" classifier "tests",

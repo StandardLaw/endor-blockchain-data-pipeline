@@ -1,10 +1,14 @@
 package com.endor.blockchain.ethereum.tokens
 
 import com.endor.storage.io.IOHandler
+import net.ruippeixotog.scalascraper.browser.JsoupBrowser
+import net.ruippeixotog.scalascraper.dsl.DSL._
+import net.ruippeixotog.scalascraper.scraper.ContentExtractors._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DataTypes
 import play.api.libs.json.{Json, OFormat}
+
 
 final case class RateRow(rateName: String, rateSymbol: String, price: Double, metaName: Option[String],
                          metaSymbol: Option[String], address: Option[String], timestamp: java.sql.Timestamp)
@@ -28,6 +32,23 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
     }
   }
 
+  private[tokens] def fetchERC20TokenListFromCoinMarketCap(): Seq[String] = {
+    val browser = JsoupBrowser.typed()
+    val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
+    val names = (doc >> elements("td[class='no-wrap currency-name']"))
+      .map(_ >> element("a"))
+      .map(_.text.trim)
+      .toSeq
+    val platforms = (doc >> elements("td[class='no-wrap platform-name']"))
+      .map(_ >> element("a"))
+      .map(_.text.toLowerCase)
+      .toSeq
+    names
+      .zip(platforms)
+      .filter(_._2 == "ethereum")
+      .map(_._1)
+  }
+
   private[tokens] def process(config: EthereumTokenRatesPipelineConfig): Dataset[RateRow] = {
     import spark.implicits._
     val metadata = spark.read.parquet(config.metadataPath)
@@ -49,9 +70,13 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
     val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
     val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
     val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
+    val tokenList = spark.createDataset(fetchERC20TokenListFromCoinMarketCap())
     rawRates
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill("n-a")
+      .join(tokenList, lower($"rateName") equalTo lower($"value"), "inner")
+      .drop("value")
+      .distinct
       .as[RateRow]
   }
 }
