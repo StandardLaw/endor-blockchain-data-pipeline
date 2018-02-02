@@ -1,9 +1,6 @@
 package com.endor.blockchain.ethereum.tokens
 
 import com.endor.storage.io.IOHandler
-import net.ruippeixotog.scalascraper.browser.JsoupBrowser
-import net.ruippeixotog.scalascraper.dsl.DSL._
-import net.ruippeixotog.scalascraper.scraper.ContentExtractors._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DataTypes
@@ -27,26 +24,9 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
                                 (implicit spark: SparkSession){
   def run(config: EthereumTokenRatesPipelineConfig): Unit = {
     if(ioHandler.getDataSize(config.inputPath) > 0) {
-      val result =process(config)
+      val result = process(config)
       result.write.mode(SaveMode.Append).parquet(config.output)
     }
-  }
-
-  private[tokens] def fetchERC20TokenListFromCoinMarketCap(): Seq[String] = {
-    val browser = JsoupBrowser.typed()
-    val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
-    val names = (doc >> elements("td[class='no-wrap currency-name']"))
-      .map(_ >> element("a"))
-      .map(_.text.trim)
-      .toSeq
-    val platforms = (doc >> elements("td[class='no-wrap platform-name']"))
-      .map(_ >> element("a"))
-      .map(_.text.toLowerCase)
-      .toSeq
-    names
-      .zip(platforms)
-      .filter(_._2 == "ethereum")
-      .map(_._1)
   }
 
   private[tokens] def process(config: EthereumTokenRatesPipelineConfig): Dataset[RateRow] = {
@@ -70,13 +50,12 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
     val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
     val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
     val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
-    val tokenList = spark.createDataset(fetchERC20TokenListFromCoinMarketCap())
+    val tokenList = spark.sparkContext.broadcast(CoinMarketCapTokeList.get().toSet)
     rawRates
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill("n-a")
-      .join(tokenList, lower($"rateName") equalTo lower($"value"), "inner")
-      .drop("value")
-      .distinct
       .as[RateRow]
+      .filter((row: RateRow) => tokenList.value.contains(row.rateName))
+
   }
 }

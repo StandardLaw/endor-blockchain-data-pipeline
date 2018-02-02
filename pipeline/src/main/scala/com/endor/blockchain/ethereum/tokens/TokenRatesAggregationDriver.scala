@@ -4,7 +4,7 @@ import java.sql.Date
 
 import com.endor.blockchain.ethereum.tokens.ratesaggregation._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
+import org.apache.spark.sql._
 import play.api.libs.json.{Json, OFormat}
 
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
@@ -23,7 +23,7 @@ object AggregatedRates {
 class TokenRatesAggregationDriver()
                                  (implicit spark: SparkSession){
   def run(config: TokenRatesAggregationConfig): Unit = {
-    process(config).write.parquet(config.outputPath)
+    process(config).write.mode(SaveMode.Overwrite).parquet(config.outputPath)
   }
 
   def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
@@ -42,20 +42,17 @@ class TokenRatesAggregationDriver()
         close($"timestamp", $"price") as "close",
         avg($"marketCap") as "marketCap"
       )
+      .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .as[AggregatedRates]
-    val baseRatesSnapshot = spark.read.parquet(config.ratesSnapshotPath)
+    val snapshotRates = spark.read.parquet(config.ratesSnapshotPath)
       .withColumn("date", to_date($"date"))
-    val snapshotWithMarketCap = if(!baseRatesSnapshot.columns.contains("marketCap")) {
-      baseRatesSnapshot
-        .withColumn("marketCap", lit(0.0))
-    } else {
-      baseRatesSnapshot
-    }
-    val snapshotRates = snapshotWithMarketCap
+      .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .as[AggregatedRates]
-    aggregatedFacts.union(snapshotRates)
-
+    val tokenList = spark.sparkContext.broadcast(CoinMarketCapTokeList.get().toSet)
+    aggregatedFacts
+      .union(snapshotRates)
+      .filter((rates: AggregatedRates) => tokenList.value.contains(rates.rateName))
   }
 }
