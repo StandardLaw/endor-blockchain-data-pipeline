@@ -13,11 +13,11 @@ object TokenFilterFromCoins {
     val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
     val names = (doc >> elements("td[class='no-wrap currency-name']"))
       .map(_ >> element("a[class='currency-name-container']"))
-      .map(_.text.trim.toLowerCase)
+      .map(_.text.toLowerCase.replace(" ", "-").replace("...", "").trim)
       .toSeq
     val platforms = (doc >> elements("td[class='no-wrap platform-name']"))
       .map(_ >> element("a"))
-      .map(_.text.toLowerCase.replace(" ", "-").replace("...", "").trim)
+      .map(_.text.toLowerCase)
       .toSeq
     names
       .zip(platforms)
