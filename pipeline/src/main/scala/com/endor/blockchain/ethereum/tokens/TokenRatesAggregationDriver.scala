@@ -3,8 +3,8 @@ package com.endor.blockchain.ethereum.tokens
 import java.sql.Date
 
 import com.endor.blockchain.ethereum.tokens.ratesaggregation._
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
 
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
@@ -50,9 +50,10 @@ class TokenRatesAggregationDriver()
       .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .as[AggregatedRates]
-    val tokenList = spark.sparkContext.broadcast(CoinMarketCapTokeList.get().toSet)
+
+    val tokensFilterUDF = TokenFilterFromCoins.getFilteringUDF()
     aggregatedFacts
       .union(snapshotRates)
-      .filter((rates: AggregatedRates) => tokenList.value.contains(rates.rateName))
+      .where(tokensFilterUDF($"rateName"))
   }
 }

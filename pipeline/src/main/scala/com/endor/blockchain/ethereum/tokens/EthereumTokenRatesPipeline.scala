@@ -50,12 +50,12 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
     val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
     val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
     val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
-    val tokenList = spark.sparkContext.broadcast(CoinMarketCapTokeList.get().toSet)
+    val tokensFilterUDF = TokenFilterFromCoins.getFilteringUDF()
     rawRates
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill("n-a")
       .as[RateRow]
-      .filter((row: RateRow) => tokenList.value.contains(row.rateName))
+      .where(tokensFilterUDF($"rateName"))
 
   }
 }
