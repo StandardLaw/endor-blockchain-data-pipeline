@@ -1,6 +1,7 @@
 package com.endor.blockchain.ethereum.tokens
 
 import com.endor.storage.io.IOHandler
+import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DataTypes
@@ -50,12 +51,16 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
     val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
     val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
     val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
-    val tokensFilterUDF = TokenFilterFromCoins.getFilteringUDF()
+    val tokenNames = scrapeTokenList()
+    val factsFilterUdf = {
+      val bc = spark.sparkContext.broadcast(tokenNames.toSet)
+      udf(bc.value.contains _)
+    }
     rawRates
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill("n-a")
+      .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[RateRow]
-      .where(tokensFilterUDF($"rateName"))
 
   }
 }

@@ -3,6 +3,7 @@ package com.endor.blockchain.ethereum.tokens
 import java.sql.Date
 
 import com.endor.blockchain.ethereum.tokens.ratesaggregation._
+import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
@@ -28,8 +29,13 @@ class TokenRatesAggregationDriver()
 
   def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
     import spark.implicits._
+    val tokens = scrapeTokenList()
 
     val facts = spark.read.parquet(config.ratesFactsPath).as[RateRow]
+    val factsFilterUdf = {
+      val bc = spark.sparkContext.broadcast(tokens.toSet)
+      udf(bc.value.contains _)
+    }
     val aggregatedFacts = facts
       .groupBy($"rateName", $"rateSymbol", to_date($"timestamp") as "date")
       .agg(
@@ -44,16 +50,20 @@ class TokenRatesAggregationDriver()
       )
       .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
+      .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
+
+    val snapFilterUdf = {
+      val bc = spark.sparkContext.broadcast(tokens.map(_.replace(" ", "-")).toSet)
+      udf(bc.value.contains _)
+    }
     val snapshotRates = spark.read.parquet(config.ratesSnapshotPath)
       .withColumn("date", to_date($"date"))
       .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
+      .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
-
-    val tokensFilterUDF = TokenFilterFromCoins.getFilteringUDF()
     aggregatedFacts
       .union(snapshotRates)
-      .where(tokensFilterUDF($"rateName"))
   }
 }
