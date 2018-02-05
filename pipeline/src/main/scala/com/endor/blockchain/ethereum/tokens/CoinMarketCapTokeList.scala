@@ -10,7 +10,7 @@ object CoinMarketCapTokeList {
     val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
     val names = (doc >> elements("td[class='no-wrap currency-name']"))
       .map(_ >> element("a[class='currency-name-container']"))
-      .map(_.text.trim)
+      .map(_.text.trim.toLowerCase)
       .toSeq
     val platforms = (doc >> elements("td[class='no-wrap platform-name']"))
       .map(_ >> element("a"))
