@@ -10,7 +10,7 @@ import play.api.libs.json.{Json, OFormat}
 
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
                                  metaName: Option[String], metaSymbol: Option[String], address: Option[String],
-                                 open: Double, high: Double, low: Double, close: Double, marketCap: Double)
+                                 open: Double, high: Double, low: Double, close: Double, marketCap: Option[Double])
 final case class TokenRatesAggregationConfig(ratesFactsPath: String, ratesSnapshotPath: String, outputPath: String)
 
 object TokenRatesAggregationConfig {
@@ -48,7 +48,6 @@ class TokenRatesAggregationDriver()
         close($"timestamp", $"price") as "close",
         avg($"marketCap") as "marketCap"
       )
-      .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
@@ -58,8 +57,8 @@ class TokenRatesAggregationDriver()
       udf(bc.value.contains _)
     }
     val snapshotRates = spark.read.parquet(config.ratesSnapshotPath)
+      .na.drop(Seq("date", "open", "high", "low", "close"))
       .withColumn("date", to_date($"date"))
-      .na.drop()
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
