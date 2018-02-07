@@ -13,7 +13,7 @@ object EthereumTokensOps {
   }
   val trimNameUdf: UserDefinedFunction = udf(trimName _)
 
-  def normalizeName(name: String): String = name.toLowerCase.replace("...", "").trim
+  def normalizeName(name: String): String = name.toLowerCase.replace("...", "").trim.replace(" ", "-")
   val normalizeNameUdf: UserDefinedFunction = udf(normalizeName _)
 
   def scrapeTokenList(): Seq[String] = {

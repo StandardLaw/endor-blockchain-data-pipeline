@@ -42,8 +42,8 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
       .json(config.inputPath)
       .where($"price_usd" isNotNull)
       .select(
-        lower(regexp_replace($"name", " ", "-")) as "rateName",
-        lower(regexp_replace($"symbol", " ", "-")) as "rateSymbol",
+        normalizeNameUdf($"name") as "rateName",
+        normalizeNameUdf($"symbol") as "rateSymbol",
         $"price_usd" cast DataTypes.DoubleType as "price",
         $"market_cap_usd" cast DataTypes.DoubleType as "marketCap",
         $"last_updated" cast DataTypes.LongType cast DataTypes.TimestampType as "timestamp"

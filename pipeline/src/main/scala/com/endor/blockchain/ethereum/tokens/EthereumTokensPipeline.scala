@@ -86,8 +86,8 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
         }
       .map(meta =>
         meta.copy(
-          name = meta.name.map(_.toLowerCase.replace(" ", "-")),
-          symbol = meta.symbol.map(_.toLowerCase.replace(" ", "-"))
+          name = meta.name.map(EthereumTokensOps.normalizeName),
+          symbol = meta.symbol.map(EthereumTokensOps.normalizeName)
         )
       )
 
