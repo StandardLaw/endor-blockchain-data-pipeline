@@ -2,8 +2,8 @@ package com.endor.blockchain.ethereum.tokens
 
 import java.sql.Date
 
-import com.endor.blockchain.ethereum.tokens.ratesaggregation._
 import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
+import com.endor.blockchain.ethereum.tokens.ratesaggregation._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
@@ -11,7 +11,8 @@ import play.api.libs.json.{Json, OFormat}
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
                                  metaName: Option[String], metaSymbol: Option[String], address: Option[String],
                                  open: Double, high: Double, low: Double, close: Double, marketCap: Option[Double])
-final case class TokenRatesAggregationConfig(ratesFactsPath: String, ratesSnapshotPath: String, outputPath: String)
+final case class TokenRatesAggregationConfig(ratesFactsPath: String, ratesSnapshotPath: String,
+                                             metadataPath: String, outputPath: String)
 
 object TokenRatesAggregationConfig {
   implicit val format: OFormat[TokenRatesAggregationConfig] = Json.format[TokenRatesAggregationConfig]
@@ -56,9 +57,16 @@ class TokenRatesAggregationDriver()
       val bc = spark.sparkContext.broadcast(tokens.map(_.replace(" ", "-")).toSet)
       udf(bc.value.contains _)
     }
+    val metadata = spark.read.parquet(config.metadataPath).select($"name" as "metaName",
+      $"symbol" as "metaSymbol", $"address")
+    val nameToNameMatch = $"rateName" equalTo $"metaName"
+    val nameToSymbolMatch = $"rateName" equalTo $"metaSymbol"
+    val symbolToNameMatch = $"rateSymbol" equalTo $"metaName"
     val snapshotRates = spark.read.parquet(config.ratesSnapshotPath)
       .na.drop(Seq("date", "open", "high", "low", "close"))
       .withColumn("date", to_date($"date"))
+      .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
+      .na.fill(Map("metaName" -> "n-a", "metaSymbol" -> "n-a", "address" -> "n-a"))
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]

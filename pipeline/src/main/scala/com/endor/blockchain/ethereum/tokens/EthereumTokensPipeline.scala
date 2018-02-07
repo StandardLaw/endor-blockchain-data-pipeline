@@ -84,6 +84,12 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
             logger.debug("Done")
             result
         }
+      .map(meta =>
+        meta.copy(
+          name = meta.name.map(_.toLowerCase.replace(" ", "-")),
+          symbol = meta.symbol.map(_.toLowerCase.replace(" ", "-"))
+        )
+      )
 
     logger.info(s"Found ${newMetadata.length} new contract metadatas")
 

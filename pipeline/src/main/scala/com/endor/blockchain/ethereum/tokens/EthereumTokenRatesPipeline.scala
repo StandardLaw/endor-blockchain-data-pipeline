@@ -42,15 +42,15 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
       .json(config.inputPath)
       .where($"price_usd" isNotNull)
       .select(
-        $"name" as "rateName",
-        $"symbol" as "rateSymbol",
+        lower(regexp_replace($"name", " ", "-")) as "rateName",
+        lower(regexp_replace($"symbol", " ", "-")) as "rateSymbol",
         $"price_usd" cast DataTypes.DoubleType as "price",
         $"market_cap_usd" cast DataTypes.DoubleType as "marketCap",
         $"last_updated" cast DataTypes.LongType cast DataTypes.TimestampType as "timestamp"
       )
-    val nameToNameMatch = lower($"rateName") equalTo lower($"metaName")
-    val nameToSymbolMatch = lower($"rateName") equalTo lower($"metaSymbol")
-    val symbolToNameMatch = lower($"rateSymbol") equalTo lower($"metaName")
+    val nameToNameMatch = $"rateName" equalTo $"metaName"
+    val nameToSymbolMatch = $"rateName" equalTo $"metaSymbol"
+    val symbolToNameMatch = $"rateSymbol" equalTo $"metaName"
     val tokenNames = scrapeTokenList()
     val factsFilterUdf = {
       val bc = spark.sparkContext.broadcast(tokenNames.toSet)
