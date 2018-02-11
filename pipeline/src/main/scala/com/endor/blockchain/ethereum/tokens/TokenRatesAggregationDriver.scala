@@ -38,11 +38,10 @@ class TokenRatesAggregationDriver()
       udf(bc.value.contains _)
     }
     val aggregatedFacts = facts
-      .groupBy($"rateName", $"rateSymbol", to_date($"timestamp") as "date")
+      .groupBy($"rateName", $"rateSymbol", $"address", to_date($"timestamp") as "date")
       .agg(
         first($"metaName") as "metaName",
         first($"metaSymbol") as "metaSymbol",
-        first($"address") as "address",
         max($"price") as "high",
         min($"price") as "low",
         open($"timestamp", $"price") as "open",
