@@ -1,5 +1,6 @@
 package com.endor.infra.spark
 
+import java.io.File
 import java.nio.file.{Path, Paths}
 import java.sql.Timestamp
 
@@ -7,6 +8,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.test.SharedSQLContext
 import org.scalatest.{BeforeAndAfterEachTestData, Matchers, TestData}
 
+import scala.collection.mutable
 import scala.util.Random
 
 /**
@@ -17,11 +19,23 @@ trait SparkDriverFunSuite extends SharedSQLContext with Matchers with BeforeAndA
   private var _randomSeed: Long = Random.nextLong()
   protected def randomSeed: Long = _randomSeed
   protected val randomGenerator: Random = new Random(randomSeed)
+  private val tempDirs: mutable.ListBuffer[File] = mutable.ListBuffer.empty
 
-  override protected def afterEach(testData: TestData): Unit = super.afterEach(testData)
+  private def deleteRecursively(file: File): Unit = {
+    if (file.isDirectory)
+      file.listFiles.foreach(deleteRecursively)
+    if (file.exists && !file.delete)
+      throw new Exception(s"Unable to delete ${file.getAbsolutePath}")
+  }
+
+  override protected def afterEach(testData: TestData): Unit = {
+    tempDirs.foreach(deleteRecursively)
+    super.afterEach(testData)
+  }
   override protected def beforeEach(testData: TestData): Unit = {
     _randomSeed = Random.nextLong()
     randomGenerator.setSeed(_randomSeed)
+    tempDirs.clear()
   }
 
   final def randomString(length: Int): String = randomGenerator.alphanumeric.take(length).mkString
@@ -42,7 +56,9 @@ trait SparkDriverFunSuite extends SharedSQLContext with Matchers with BeforeAndA
     val tmpDir = Paths.get(System.getProperty("java.io.tmpdir"))
     val name: Path = tmpDir.getFileSystem.getPath(tmpName)
     if (name.getParent != null) throw new IllegalArgumentException("Invalid prefix or suffix")
-    tmpDir.resolve(name).toString
+    val newTempDir = tmpDir.resolve(name)
+    tempDirs += newTempDir.toFile
+    newTempDir.toString
   }
 }
 

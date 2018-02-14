@@ -1,5 +1,5 @@
 // Every once in a while run `sbt dependencyUpdates` and `sbt dependencyCheckAggregate` here
-import sbt.librarymanagement.Resolver
+import Tests._
 
 enablePlugins(GitVersioning)
 git.useGitDescribe := true
@@ -126,6 +126,15 @@ lazy val `jobnik-client` = project.in(file("libraries/jobnik-client"))
 lazy val pipeline = project.in(file("pipeline"))
   .dependsOn(`jobnik-client`, serialization)
   .settings(defaultSettings ++ assemblySettings)
+  .settings(
+    // Allow parallel execution of tests as long as each of them gets its own JVM to create a SparkContext on (see SPARK-2243)
+    fork in Test := true,
+    testGrouping in Test := (definedTests in Test)
+      .value
+      .map(test => Group(test.name, Seq(test), SubProcess(ForkOptions()))),
+
+    testOptions in Test := Seq()
+  )
   .settings(libraryDependencies ++= Seq(
     "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "provided,test",
     "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "provided,test",
