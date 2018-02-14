@@ -2,13 +2,16 @@ package com.endor.blockchain.ethereum.tokens
 
 import akka.actor.ActorSystem
 import ch.qos.logback.classic.{Logger, LoggerContext}
+import com.endor.DataKey
 import com.endor.blockchain.ethereum.ByteArrayUtil
 import com.endor.infra.{LoggingComponent, SparkSessionComponent}
 import com.endor.spark.blockchain._
 import com.endor.spark.blockchain.ethereum.block.EthereumBlockHeader
 import com.endor.spark.blockchain.ethereum.token.TokenTransferEvent
 import com.endor.spark.blockchain.ethereum.token.metadata._
+import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
 import com.endor.storage.io.{IOHandler, IOHandlerComponent}
+import com.endor.storage.sources._
 import org.apache.spark.sql.types.DataTypes
 import org.apache.spark.sql.{Dataset, SaveMode, SparkSession, functions => F}
 import org.web3j.protocol.Web3j
@@ -18,8 +21,10 @@ import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 
-final case class EthereumTokensPipelineConfig(input: String, blocksInput: String, output: String,
-                                              metadataCachePath: String, metadataOutputPath: String)
+final case class EthereumTokensPipelineConfig(input: String, blocksInput: String,
+                                              output: DataKey[ProcessedTokenTransaction],
+                                              metadataCachePath: String,
+                                              metadataOutputPath: DataKey[TokenMetadata])
 
 object EthereumTokensPipelineConfig {
   implicit val format: OFormat[EthereumTokensPipelineConfig] = Json.format[EthereumTokensPipelineConfig]
@@ -28,7 +33,8 @@ object EthereumTokensPipelineConfig {
 final case class BlockInfo(number: Long, timestamp: java.sql.Timestamp)
 
 class EthereumTokensPipeline(scraper: TokenMetadataScraper)
-                            (implicit spark: SparkSession, loggerFactory: LoggerContext, ioHandler: IOHandler) {
+                            (implicit spark: SparkSession, loggerFactory: LoggerContext,
+                             ioHandler: IOHandler, datasetStore: DatasetStore) {
   private lazy val logger: Logger = loggerFactory.getLogger(this.getClass)
 
   private def createProcessedDs(events: Dataset[TokenTransferEvent], tokenMetadata: Dataset[TokenMetadata],
@@ -115,7 +121,7 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
 
   def run(config: EthereumTokensPipelineConfig)
          (implicit ec: ExecutionContext): Unit = {
-    ioHandler.deleteFilesByPredicate(ioHandler.extractPathFromFullURI(config.output), _ => true)
+    ioHandler.deleteFilesByPredicate(config.output.inbox.path, _ => true)
 
     import spark.implicits._
 
@@ -143,11 +149,10 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
 
     val updatedMetadata = scrapeMissingMetadata(config, parsedEvents, metadataDs)
 
-    updatedMetadata
-      .filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty))
-      .write
-      .mode(SaveMode.Overwrite)
-      .parquet(config.metadataOutputPath)
+    datasetStore.storeParquet(
+      config.metadataOutputPath.inbox,
+      updatedMetadata.filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty))
+    )
 
     val newBlockHeaders = spark
       .read
@@ -157,10 +162,7 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
       .as[BlockInfo]
 
     val processedDs = createProcessedDs(parsedEvents, updatedMetadata, newBlockHeaders)
-    processedDs
-      .write
-      .mode(SaveMode.Append)
-      .parquet(config.output)
+    datasetStore.storeParquet(config.output.inbox, processedDs, saveMode = SaveMode.Append)
   }
 }
 
@@ -169,7 +171,7 @@ object EthereumTokensPipeline {
 }
 
 trait EthereumTokenPipelineComponent {
-  this: LoggingComponent with SparkSessionComponent with IOHandlerComponent =>
+  this: LoggingComponent with SparkSessionComponent with DatasetStoreComponent with IOHandlerComponent =>
 
   private val scraper = {
     implicit val actorSystem: ActorSystem = ActorSystem()
@@ -183,5 +185,5 @@ trait EthereumTokenPipelineComponent {
     )
   }
 
-  val driver: EthereumTokensPipeline = new EthereumTokensPipeline(scraper)
+  lazy val driver: EthereumTokensPipeline = new EthereumTokensPipeline(scraper)
 }

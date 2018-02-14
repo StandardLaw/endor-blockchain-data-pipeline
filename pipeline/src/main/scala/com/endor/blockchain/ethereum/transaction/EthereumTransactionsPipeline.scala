@@ -2,21 +2,26 @@ package com.endor.blockchain.ethereum.transaction
 
 import java.sql.Timestamp
 
+import com.endor.DataKey
 import com.endor.blockchain.ethereum.ByteArrayUtil
+import com.endor.infra.SparkSessionComponent
 import com.endor.spark.blockchain._
 import com.endor.spark.blockchain.ethereum._
 import com.endor.spark.blockchain.ethereum.block.SimpleEthereumBlock
-import com.endor.storage.io.IOHandler
+import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
+import com.endor.storage.io.{IOHandler, IOHandlerComponent}
+import com.endor.storage.sources._
 import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
 import play.api.libs.json.{Json, OFormat}
 
-final case class EthereumTransactionsPipelineConfig(input: String, output: String)
+final case class EthereumTransactionsPipelineConfig(input: String, output: DataKey[ProcessedTransaction])
 
 object EthereumTransactionsPipelineConfig {
   implicit val format: OFormat[EthereumTransactionsPipelineConfig] = Json.format[EthereumTransactionsPipelineConfig]
 }
 
-class EthereumTransactionsPipeline(ioHandler: IOHandler)(implicit spark: SparkSession) {
+class EthereumTransactionsPipeline()
+                                  (implicit spark: SparkSession, ioHandler: IOHandler, datasetStore: DatasetStore) {
 
   def createTransactionsDS(rawEthereum: Dataset[SimpleEthereumBlock]): Dataset[ProcessedTransaction] = {
     rawEthereum
@@ -40,14 +45,17 @@ class EthereumTransactionsPipeline(ioHandler: IOHandler)(implicit spark: SparkSe
   }
 
   def run(config: EthereumTransactionsPipelineConfig): Unit = {
-    ioHandler.deleteFilesByPredicate(ioHandler.extractPathFromFullURI(config.output), _ => true)
+    ioHandler.deleteFilesByPredicate(config.output.inbox.path, _ => true)
     val rawBlocks = spark
       .read
       .ethereum(config.input)
     val transactions = createTransactionsDS(rawBlocks)
-    transactions
-      .write
-      .mode(SaveMode.Append)
-      .parquet(config.output)
+    datasetStore.storeParquet(config.output.inbox, transactions, saveMode = SaveMode.Append)
   }
+}
+
+trait EthereumTransactionsPipelineComponent {
+  this: SparkSessionComponent with IOHandlerComponent with DatasetStoreComponent =>
+
+  lazy val driver: EthereumTransactionsPipeline = new EthereumTransactionsPipeline()
 }

@@ -1,7 +1,11 @@
 package com.endor.blockchain.ethereum.tokens
 
-import com.endor.storage.io.IOHandler
+import com.endor.DataKey
 import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
+import com.endor.infra.SparkSessionComponent
+import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
+import com.endor.storage.io.{IOHandler, IOHandlerComponent}
+import com.endor.storage.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DataTypes
@@ -15,18 +19,18 @@ object RateRow {
   implicit val encoder: Encoder[RateRow] = Encoders.product[RateRow]
 }
 
-final case class EthereumTokenRatesPipelineConfig(inputPath: String, metadataPath: String, output: String)
+final case class EthereumTokenRatesPipelineConfig(inputPath: String, metadataPath: String, output: DataKey[RateRow])
 
 object EthereumTokenRatesPipelineConfig {
   implicit val format: OFormat[EthereumTokenRatesPipelineConfig] = Json.format[EthereumTokenRatesPipelineConfig]
 }
 
-class EthereumTokenRatesPipeline(ioHandler: IOHandler)
-                                (implicit spark: SparkSession){
+class EthereumTokenRatesPipeline()
+                                (implicit spark: SparkSession, ioHandler: IOHandler, datasetStore: DatasetStore){
   def run(config: EthereumTokenRatesPipelineConfig): Unit = {
     if(ioHandler.getDataSize(config.inputPath) > 0) {
       val result = process(config)
-      result.write.mode(SaveMode.Append).parquet(config.output)
+      datasetStore.storeParquet(config.output.inbox, result, saveMode = SaveMode.Append)
     }
   }
 
@@ -63,4 +67,10 @@ class EthereumTokenRatesPipeline(ioHandler: IOHandler)
       .as[RateRow]
 
   }
+}
+
+trait EthereumTokenRatesPipelineComponent {
+  this: SparkSessionComponent with DatasetStoreComponent with IOHandlerComponent =>
+
+  lazy val driver: EthereumTokenRatesPipeline = new EthereumTokenRatesPipeline()
 }

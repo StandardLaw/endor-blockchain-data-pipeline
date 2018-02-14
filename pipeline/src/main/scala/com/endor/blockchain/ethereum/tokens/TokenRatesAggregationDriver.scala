@@ -1,38 +1,54 @@
 package com.endor.blockchain.ethereum.tokens
 
-import java.sql.Date
+import java.sql.{Date, Timestamp}
 
+import com.endor.DataKey
 import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
 import com.endor.blockchain.ethereum.tokens.ratesaggregation._
+import com.endor.infra.{Driver, DriverComponent, SparkSessionComponent}
+import com.endor.storage.sources._
+import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
 
+private[tokens] final case class RatesSnapshotRow(rateName: String, rateSymbol: String, date: Option[Timestamp],
+                                          open: Option[Double], high: Option[Double], low: Option[Double],
+                                          close: Option[Double], marketCap: Option[Double])
+
+object RatesSnapshotRow {
+  implicit val encoder: Encoder[RatesSnapshotRow] = Encoders.product[RatesSnapshotRow]
+}
+
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
                                  metaName: Option[String], metaSymbol: Option[String], address: Option[String],
                                  open: Double, high: Double, low: Double, close: Double, marketCap: Option[Double])
-final case class TokenRatesAggregationConfig(ratesFactsPath: String, ratesSnapshotPath: String,
-                                             metadataPath: String, outputPath: String)
-
-object TokenRatesAggregationConfig {
-  implicit val format: OFormat[TokenRatesAggregationConfig] = Json.format[TokenRatesAggregationConfig]
-}
 
 object AggregatedRates {
   implicit val encoder: Encoder[AggregatedRates] = Encoders.product[AggregatedRates]
 }
 
+final case class TokenRatesAggregationConfig(ratesFactsKey: DataKey[RateRow],
+                                             ratesSnapshotKey: DataKey[RatesSnapshotRow],
+                                             metadataPath: String, outputKey: DataKey[AggregatedRates])
+
+object TokenRatesAggregationConfig {
+  implicit val format: OFormat[TokenRatesAggregationConfig] = Json.format[TokenRatesAggregationConfig]
+}
+
 class TokenRatesAggregationDriver()
-                                 (implicit spark: SparkSession){
-  def run(config: TokenRatesAggregationConfig): Unit = {
-    process(config).write.mode(SaveMode.Overwrite).parquet(config.outputPath)
+                                 (implicit spark: SparkSession, datasetStore: DatasetStore)
+  extends Driver[TokenRatesAggregationConfig] {
+
+  override def run(config: TokenRatesAggregationConfig): Unit = {
+    datasetStore.storeParquet(config.outputKey.inbox, process(config))
   }
 
-  def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
+  private def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
     import spark.implicits._
     val tokens = scrapeTokenList()
 
-    val facts = spark.read.parquet(config.ratesFactsPath).as[RateRow]
+    val facts = datasetStore.loadParquet(config.ratesFactsKey.onBoarded)
     val factsFilterUdf = {
       val bc = spark.sparkContext.broadcast(tokens.toSet)
       udf(bc.value.contains _)
@@ -61,7 +77,7 @@ class TokenRatesAggregationDriver()
     val nameToNameMatch = $"rateName" equalTo $"metaName"
     val nameToSymbolMatch = $"rateName" equalTo $"metaSymbol"
     val symbolToNameMatch = $"rateSymbol" equalTo $"metaName"
-    val snapshotRates = spark.read.parquet(config.ratesSnapshotPath)
+    val snapshotRates = datasetStore.loadParquet(config.ratesSnapshotKey.onBoarded)
       .na.drop(Seq("date", "open", "high", "low", "close"))
       .withColumn("date", to_date($"date"))
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
@@ -72,4 +88,9 @@ class TokenRatesAggregationDriver()
     aggregatedFacts
       .union(snapshotRates)
   }
+}
+
+trait TokenRatesAggregationDriverComponent extends DriverComponent[TokenRatesAggregationDriver] {
+  this: SparkSessionComponent with DatasetStoreComponent =>
+  val driver: TokenRatesAggregationDriver = new TokenRatesAggregationDriver()
 }

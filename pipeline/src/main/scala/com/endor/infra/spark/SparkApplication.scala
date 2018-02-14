@@ -4,10 +4,10 @@ import java.util.Base64
 
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.util.ContextInitializer
-import com.endor.artifacts.{ArtifactPublishingMode, PublicationMedium, RedisMode}
 import com.endor.context.Context
 import com.endor.entrypoint._
-import com.endor.jobnik.{Jobnik, JobnikContainer, JobnikDIConfiguration, JobnikSession}
+import com.endor.infra.DIConfiguration
+import com.endor.jobnik.{Jobnik, JobnikContainer, JobnikSession}
 import org.apache.spark.sql.SparkSession
 import play.api.libs.json._
 
@@ -15,17 +15,9 @@ import scala.util.{Failure, Success, Try}
 
 final case class SparkEntryPointConfiguration[T: Reads](applicationConf: T)
 
-final case class DIConfiguration(artifactPublishers: ArtifactPublishingMode,
-                                 publicationMedium: PublicationMedium,
-                                 redisMode: Option[RedisMode]) extends JobnikDIConfiguration
-
-object DIConfiguration {
-  implicit val format: OFormat[DIConfiguration] = Json.format[DIConfiguration]
-}
-
 abstract class SparkApplication[T: Reads] {
   protected def createEntryPointConfig(configuration: SparkEntryPointConfiguration[T]): EntryPointConfig
-  protected def run(sparkSession: SparkSession, configuration: T)
+  protected def run(sparkSession: SparkSession, dIConf: DIConfiguration, configuration: T)
                    (implicit context: Context, jobnikSession: Option[JobnikSession]): Unit
 
   @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
@@ -89,7 +81,7 @@ abstract class SparkApplication[T: Reads] {
       if (!jobAborted.getOrElse(false)) {
         implicit val endorContext: Context = Context(testMode = testMode)
         spark.withContext(entryPointConfig) {
-          run(spark, configuration.applicationConf)
+          run(spark, diConf, configuration.applicationConf)
         }
       }
     }

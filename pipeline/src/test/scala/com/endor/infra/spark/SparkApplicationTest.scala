@@ -2,6 +2,9 @@ package com.endor.infra.spark
 
 import com.amazonaws.auth.{AWSCredentialsProviderChain, InstanceProfileCredentialsProvider}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.endor._
+import com.endor.blockchain.ethereum.tokens.{EthereumTokensPipelineConfig, ProcessedTokenTransaction}
+import com.endor.spark.blockchain.ethereum.token.metadata.TokenMetadata
 import org.apache.spark.sql.test.SharedSQLContext
 import play.api.libs.json._
 
@@ -86,5 +89,14 @@ class SparkApplicationTest extends SharedSQLContext {
         |    }
         |}""".stripMargin)
     debugSparkApplication(json.as[JsObject])
+  }
+
+  test("ser") {
+    val conf = EthereumTokensPipelineConfig("input", "blocksInput",
+      DataKey(CustomerId("erc20-tokens"), DataId[ProcessedTokenTransaction]("transactions")),
+      "metadataChache",
+      DataKey(CustomerId("erc20-tokens"), DataId[TokenMetadata]("meta_meta"))
+    )
+    println(Json.prettyPrint(Json.toJson(conf)))
   }
 }

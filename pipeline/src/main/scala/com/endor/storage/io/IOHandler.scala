@@ -24,4 +24,3 @@ trait IOHandler {
   }
   def moveFile(sourceFilePath: String, destFilePath: String): Unit
 }
-

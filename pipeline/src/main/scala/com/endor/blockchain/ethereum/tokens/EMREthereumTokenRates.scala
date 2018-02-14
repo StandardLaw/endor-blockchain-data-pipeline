@@ -2,9 +2,9 @@ package com.endor.blockchain.ethereum.tokens
 
 import com.endor.context.Context
 import com.endor.entrypoint.EntryPointConfig
-import com.endor.infra.spark.{SparkApplication, SparkEntryPointConfiguration, SparkInfrastructure}
+import com.endor.infra.spark.{SparkApplication, SparkEntryPointConfiguration}
+import com.endor.infra.{BaseComponent, DIConfiguration}
 import com.endor.jobnik.JobnikSession
-import com.endor.storage.io.S3IOHandler
 import org.apache.spark.sql.SparkSession
 
 object EMREthereumTokenRates extends SparkApplication[EthereumTokenRatesPipelineConfig] {
@@ -12,10 +12,13 @@ object EMREthereumTokenRates extends SparkApplication[EthereumTokenRatesPipeline
     EntryPointConfig("EtheruemTokenRates")
 
 
-  override protected def run(sparkSession: SparkSession, configuration: EthereumTokenRatesPipelineConfig)
+  override protected def run(sparkSession: SparkSession, diConf: DIConfiguration,
+                             configuration: EthereumTokenRatesPipelineConfig)
                             (implicit context: Context, jobnikSession: Option[JobnikSession]): Unit = {
-    val ioHandler = new S3IOHandler(SparkInfrastructure.EMR(true))
-    val driver = new EthereumTokenRatesPipeline(ioHandler)(sparkSession)
-    driver.run(configuration)
+    val container = new EthereumTokenRatesPipelineComponent with BaseComponent {
+      override val diConfiguration: DIConfiguration = diConf
+      override implicit def spark: SparkSession = sparkSession
+    }
+    container.driver.run(configuration)
   }
 }
