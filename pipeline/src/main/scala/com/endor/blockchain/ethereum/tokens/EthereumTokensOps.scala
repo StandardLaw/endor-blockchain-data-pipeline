@@ -18,7 +18,12 @@ object EthereumTokensOps {
   def normalizeName(name: String): String = name.toLowerCase.replace("...", "").trim.replace(" ", "-")
   val normalizeNameUdf: UserDefinedFunction = udf(normalizeName _)
 
-  def scrapeTokenList(): Seq[String] = {
+  trait TokenListScraper {
+    def scrape(): Seq[String]
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
+  val coinMarketCapScraper: TokenListScraper = () => {
     val browser = JsoupBrowser.typed()
     val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
     val names = (doc >> elements("td[class='no-wrap currency-name']"))

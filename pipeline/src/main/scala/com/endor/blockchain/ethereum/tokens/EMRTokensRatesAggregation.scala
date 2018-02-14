@@ -17,6 +17,7 @@ object EMRTokensRatesAggregation extends SparkApplication[TokenRatesAggregationC
     val container = new TokenRatesAggregationDriverComponent with BaseComponent {
       override implicit def spark: SparkSession = sparkSession
       override def diConfiguration: DIConfiguration = diConf
+      override def tokenListScraper: EthereumTokensOps.TokenListScraper = EthereumTokensOps.coinMarketCapScraper
     }
     container.driver.run(configuration)
   }

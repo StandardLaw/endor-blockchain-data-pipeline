@@ -1,5 +1,6 @@
 package com.endor.infra.spark
 
+import java.nio.file.{Path, Paths}
 import java.sql.Timestamp
 
 import org.apache.spark.sql.SparkSession
@@ -34,6 +35,14 @@ trait SparkDriverFunSuite extends SharedSQLContext with Matchers with BeforeAndA
 
   final def randomDate(): Timestamp = {
     randomDate(new Timestamp(0L), new Timestamp(Long.MaxValue))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  final def createTempDir(tmpName: String): String = {
+    val tmpDir = Paths.get(System.getProperty("java.io.tmpdir"))
+    val name: Path = tmpDir.getFileSystem.getPath(tmpName)
+    if (name.getParent != null) throw new IllegalArgumentException("Invalid prefix or suffix")
+    tmpDir.resolve(name).toString
   }
 }
 

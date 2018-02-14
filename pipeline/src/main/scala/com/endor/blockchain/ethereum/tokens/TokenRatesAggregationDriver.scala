@@ -5,9 +5,9 @@ import java.sql.{Date, Timestamp}
 import com.endor.DataKey
 import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
 import com.endor.blockchain.ethereum.tokens.ratesaggregation._
-import com.endor.infra.{Driver, DriverComponent, SparkSessionComponent}
-import com.endor.storage.sources._
+import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
+import com.endor.storage.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
@@ -36,17 +36,16 @@ object TokenRatesAggregationConfig {
   implicit val format: OFormat[TokenRatesAggregationConfig] = Json.format[TokenRatesAggregationConfig]
 }
 
-class TokenRatesAggregationDriver()
-                                 (implicit spark: SparkSession, datasetStore: DatasetStore)
-  extends Driver[TokenRatesAggregationConfig] {
+class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
+                                 (implicit spark: SparkSession, datasetStore: DatasetStore){
 
-  override def run(config: TokenRatesAggregationConfig): Unit = {
+  def run(config: TokenRatesAggregationConfig): Unit = {
     datasetStore.storeParquet(config.outputKey.inbox, process(config))
   }
 
   private def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
     import spark.implicits._
-    val tokens = scrapeTokenList()
+    val tokens = tokenListScraper.scrape()
 
     val facts = datasetStore.loadParquet(config.ratesFactsKey.onBoarded)
     val factsFilterUdf = {
@@ -90,7 +89,8 @@ class TokenRatesAggregationDriver()
   }
 }
 
-trait TokenRatesAggregationDriverComponent extends DriverComponent[TokenRatesAggregationDriver] {
+trait TokenRatesAggregationDriverComponent {
   this: SparkSessionComponent with DatasetStoreComponent =>
-  val driver: TokenRatesAggregationDriver = new TokenRatesAggregationDriver()
+  def tokenListScraper: TokenListScraper
+  val driver: TokenRatesAggregationDriver = new TokenRatesAggregationDriver(tokenListScraper)
 }

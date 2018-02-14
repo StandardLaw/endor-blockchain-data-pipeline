@@ -18,6 +18,7 @@ object EMREthereumTokenRates extends SparkApplication[EthereumTokenRatesPipeline
     val container = new EthereumTokenRatesPipelineComponent with BaseComponent {
       override val diConfiguration: DIConfiguration = diConf
       override implicit def spark: SparkSession = sparkSession
+      override def tokenListScraper: EthereumTokensOps.TokenListScraper = EthereumTokensOps.coinMarketCapScraper
     }
     container.driver.run(configuration)
   }

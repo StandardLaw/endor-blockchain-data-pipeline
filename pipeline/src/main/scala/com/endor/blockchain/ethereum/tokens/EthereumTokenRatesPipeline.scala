@@ -1,7 +1,7 @@
 package com.endor.blockchain.ethereum.tokens
 
 import com.endor.DataKey
-import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
+import com.endor.blockchain.ethereum.tokens.EthereumTokensOps.{TokenListScraper, _}
 import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
 import com.endor.storage.io.{IOHandler, IOHandlerComponent}
@@ -25,7 +25,11 @@ object EthereumTokenRatesPipelineConfig {
   implicit val format: OFormat[EthereumTokenRatesPipelineConfig] = Json.format[EthereumTokenRatesPipelineConfig]
 }
 
-class EthereumTokenRatesPipeline()
+private[tokens] final case class RawRateRow(name: String, symbol: String, price_usd: Option[String],
+                                           market_cap_usd: String, last_updated: String)
+private[tokens] final case class MetadataRow(name: String, symbol: String, address: String)
+
+class EthereumTokenRatesPipeline(tokenListScraper: TokenListScraper)
                                 (implicit spark: SparkSession, ioHandler: IOHandler, datasetStore: DatasetStore){
   def run(config: EthereumTokenRatesPipelineConfig): Unit = {
     if(ioHandler.getDataSize(config.inputPath) > 0) {
@@ -37,6 +41,7 @@ class EthereumTokenRatesPipeline()
   private[tokens] def process(config: EthereumTokenRatesPipelineConfig): Dataset[RateRow] = {
     import spark.implicits._
     val metadata = spark.read.parquet(config.metadataPath)
+      .as[MetadataRow]
       .select(
         $"name" as "metaName",
         $"symbol" as "metaSymbol",
@@ -44,6 +49,7 @@ class EthereumTokenRatesPipeline()
       )
     val rawRates = spark.read
       .json(config.inputPath)
+      .as[RawRateRow]
       .where($"price_usd" isNotNull)
       .select(
         normalizeNameUdf($"name") as "rateName",
@@ -55,7 +61,7 @@ class EthereumTokenRatesPipeline()
     val nameToNameMatch = $"rateName" equalTo $"metaName"
     val nameToSymbolMatch = $"rateName" equalTo $"metaSymbol"
     val symbolToNameMatch = $"rateSymbol" equalTo $"metaName"
-    val tokenNames = scrapeTokenList()
+    val tokenNames = tokenListScraper.scrape()
     val factsFilterUdf = {
       val bc = spark.sparkContext.broadcast(tokenNames.toSet)
       udf(bc.value.contains _)
@@ -71,6 +77,6 @@ class EthereumTokenRatesPipeline()
 
 trait EthereumTokenRatesPipelineComponent {
   this: SparkSessionComponent with DatasetStoreComponent with IOHandlerComponent =>
-
-  lazy val driver: EthereumTokenRatesPipeline = new EthereumTokenRatesPipeline()
+  def tokenListScraper: TokenListScraper
+  final lazy val driver: EthereumTokenRatesPipeline = new EthereumTokenRatesPipeline(tokenListScraper)
 }
