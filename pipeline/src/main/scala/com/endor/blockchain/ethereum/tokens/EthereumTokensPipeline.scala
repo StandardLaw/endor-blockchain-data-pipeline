@@ -108,7 +108,7 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
           n <- metadata.name
           s <- metadata.symbol
           _ <- metadata.decimals
-        } yield !n.isEmpty && !s.isEmpty
+        } yield n.nonEmpty && s.nonEmpty
 
         symbolAndDecimalsAreOk.getOrElse(false)
       })

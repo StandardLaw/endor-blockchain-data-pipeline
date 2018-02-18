@@ -44,9 +44,15 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
   }
 
   private def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
-    import spark.implicits._
     val tokens = tokenListScraper.scrape()
+    val aggregatedFacts = aggregateFacts(config, tokens)
+    val snapshotRates = createAggregatedDsFromSnapshotAndMetadata(config, tokens)
+    aggregatedFacts
+      .union(snapshotRates)
+  }
 
+  private def aggregateFacts(config: TokenRatesAggregationConfig, tokens: Seq[String]) = {
+    import spark.implicits._
     val facts = datasetStore.loadParquet(config.ratesFactsKey.onBoarded)
     val factsFilterUdf = {
       val bc = spark.sparkContext.broadcast(tokens.toSet)
@@ -66,7 +72,11 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
+    aggregatedFacts
+  }
 
+  private def createAggregatedDsFromSnapshotAndMetadata(config: TokenRatesAggregationConfig, tokens: Seq[String]) = {
+    import spark.implicits._
     val snapFilterUdf = {
       val bc = spark.sparkContext.broadcast(tokens.map(_.replace(" ", "-")).toSet)
       udf(bc.value.contains _)
@@ -84,8 +94,7 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
-    aggregatedFacts
-      .union(snapshotRates)
+    snapshotRates
   }
 }
 
