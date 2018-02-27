@@ -55,7 +55,7 @@ def chunks(l, n):
 def export_blocks(first_export, last_export):
     try:
         LOGGER.debug("Killing geth...")
-        sh.pkill("geth").wait()
+        subprocess.call('sudo systemctl stop geth', shell=True)
         LOGGER.debug("Done")
     except sh.ErrorReturnCode_1:
         raise
@@ -68,7 +68,7 @@ def export_blocks(first_export, last_export):
         subprocess.Popen(["geth", "export", os.path.join(export_directory, "{}-{}.bin".format(batch_start, batch_end)),
                           str(batch_start), str(batch_end)]).wait()
         LOGGER.info("Done")
-    subprocess.Popen('nohup geth --rpc --rpcaddr 0.0.0.0 --cache 2048 --syncmode "full" > geth.log &', shell=True)
+    subprocess.call('sudo systemctl start geth', shell=True)
     return export_directory
 
 
