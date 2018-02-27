@@ -1,4 +1,3 @@
-import re
 import os
 import math
 import time
@@ -27,11 +26,9 @@ def build_export_batches(start_block, end_block, blocks_per_batch):
 
 
 def get_last_fetched_block():
-    number_regex = re.compile("(?<=number=)(\d+)")
-    results = []
-    for line in sh.tail("-10", GETH_LOG_PATH):
-        results.extend(number_regex.findall(line))
-    return max(int(i) for i in results)
+    proc = subprocess.Popen('geth --exec "web3.eth.syncing.currentBlock" attach', shell=True, stdout=subprocess.PIPE)
+    proc.wait()
+    return int(proc.stdout.read().strip())
 
 
 def get_last_exported_block():
@@ -63,7 +60,7 @@ def export_blocks(first_export, last_export):
     except sh.ErrorReturnCode_1:
         raise
     time.sleep(5)
-    export_batches = build_export_batches(first_export, last_export, 10000)
+    export_batches = build_export_batches(first_export, last_export, 250)
     export_directory = mkdtemp()
     LOGGER.debug("blocks directory {}".format(export_directory))
     for batch_start, batch_end in export_batches:
@@ -89,21 +86,24 @@ def export_logs(first_export, last_export):
 
 
 def export():
-    first_export = get_last_exported_block() + 1
-    last_export = get_last_fetched_block() - 10
-    LOGGER.info("Exporting between {} - {}".format(first_export, last_export))
-    logs_directory = export_logs(first_export, last_export)
-    blocks_export_directory = export_blocks(first_export, last_export)
-    LOGGER.info("Uploading blocks")
-    subprocess.call('aws s3 sync {} s3://endor-blockchains/ethereum/blocks/Inbox'.format(blocks_export_directory),
-                    shell=True)
-    LOGGER.info("Uploading logs")
-    subprocess.call('aws s3 sync {} s3://endor-blockchains/ethereum/logs/Inbox'.format(logs_directory), shell=True)
-    with open(LAST_EXPORTED_PATH, 'w') as f:
-        f.write(str(last_export))
-    LOGGER.info("Removing temp dirs")
-    shutil.rmtree(blocks_export_directory)
-    shutil.rmtree(logs_directory)
+    try:
+        first_export = get_last_exported_block() + 1
+        last_export = get_last_fetched_block() - 10
+        LOGGER.info("Exporting between {} - {}".format(first_export, last_export))
+        logs_directory = export_logs(first_export, last_export)
+        blocks_export_directory = export_blocks(first_export, last_export)
+        LOGGER.info("Uploading blocks")
+        subprocess.call('aws s3 sync {} s3://endor-blockchains/ethereum/blocks/Inbox'.format(blocks_export_directory),
+                        shell=True)
+        LOGGER.info("Uploading logs")
+        subprocess.call('aws s3 sync {} s3://endor-blockchains/ethereum/logs/Inbox'.format(logs_directory), shell=True)
+        with open(LAST_EXPORTED_PATH, 'w') as f:
+            f.write(str(last_export))
+        LOGGER.info("Removing temp dirs")
+        shutil.rmtree(blocks_export_directory)
+        shutil.rmtree(logs_directory)
+    except:
+        LOGGER.error("Exception in main", exc_info=True)
 
 
 if __name__ == "__main__":
