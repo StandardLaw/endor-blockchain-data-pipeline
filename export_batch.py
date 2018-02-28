@@ -1,4 +1,5 @@
 import os
+import re
 import math
 import time
 import shutil
@@ -26,9 +27,14 @@ def build_export_batches(start_block, end_block, blocks_per_batch):
 
 
 def get_last_fetched_block():
-    proc = subprocess.Popen('geth --exec "web3.eth.syncing.currentBlock" attach', shell=True, stdout=subprocess.PIPE)
-    proc.wait()
-    return int(proc.stdout.read().strip())
+    number_regex = re.compile("(?<=number=)(\d+)")
+    results = []
+    p = subprocess.Popen('journalctl -u geth --no-pager -n 2', shell=True, stdout=subprocess.PIPE)
+    p.wait()
+    lines = p.stdout.readlines()
+    for line in lines:
+        results.extend(number_regex.findall(line))
+    return max(int(i) for i in results)
 
 
 def get_last_exported_block():
@@ -39,11 +45,11 @@ def get_last_exported_block():
 def start_logs_fetcher(batch_start, batch_end, logs_directory):
     LOGGER.info("Exporting logs {} - {}".format(batch_start, batch_end))
     return subprocess.Popen([
-            "java", "-cp", "/home/ubuntu/fetcher.jar", "com.endor.spark.blockchain.ethereum.token.logsfetcher.LogsFetcher",
-            "fetch", "--communicationMode", "http 127.0.0.1:8545",
-            "--fromBlock", str(batch_start), "--toBlock", str(batch_end),
-            "--topics", "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-            "--output", os.path.join(logs_directory, "{}-{}.json".format(batch_start, batch_end))])
+        "java", "-cp", "/home/ubuntu/fetcher.jar", "com.endor.spark.blockchain.ethereum.token.logsfetcher.LogsFetcher",
+        "fetch", "--communicationMode", "http 127.0.0.1:8545",
+        "--fromBlock", str(batch_start), "--toBlock", str(batch_end),
+        "--topics", "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "--output", os.path.join(logs_directory, "{}-{}.json".format(batch_start, batch_end))])
 
 
 def chunks(l, n):
@@ -55,12 +61,12 @@ def chunks(l, n):
 def export_blocks(first_export, last_export):
     try:
         LOGGER.debug("Killing geth...")
-        subprocess.call('sudo systemctl stop geth', shell=True)
+        subprocess.call("sudo systemctl stop geth", shell=True)
         LOGGER.debug("Done")
     except sh.ErrorReturnCode_1:
         raise
     time.sleep(5)
-    export_batches = build_export_batches(first_export, last_export, 250)
+    export_batches = build_export_batches(first_export, last_export, 50)
     export_directory = mkdtemp()
     LOGGER.debug("blocks directory {}".format(export_directory))
     for batch_start, batch_end in export_batches:
@@ -68,7 +74,7 @@ def export_blocks(first_export, last_export):
         subprocess.Popen(["geth", "export", os.path.join(export_directory, "{}-{}.bin".format(batch_start, batch_end)),
                           str(batch_start), str(batch_end)]).wait()
         LOGGER.info("Done")
-    subprocess.call('sudo systemctl start geth', shell=True)
+    subprocess.call("sudo systemctl start geth", shell=True)
     return export_directory
 
 
