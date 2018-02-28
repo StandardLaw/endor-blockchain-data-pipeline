@@ -4,7 +4,7 @@ import java.sql.{Date, Timestamp}
 
 import com.endor.DataKey
 import com.endor.blockchain.ethereum.tokens.EthereumTokensOps._
-import com.endor.blockchain.ethereum.tokens.ratesaggregation._
+import com.endor.blockchain.ethereum.ratesaggregation._
 import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._

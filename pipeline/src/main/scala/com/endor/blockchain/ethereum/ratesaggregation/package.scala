@@ -1,4 +1,4 @@
-package com.endor.blockchain.ethereum.tokens
+package com.endor.blockchain.ethereum
 
 package object ratesaggregation {
   val open: OpenRateAggregator = new OpenRateAggregator()

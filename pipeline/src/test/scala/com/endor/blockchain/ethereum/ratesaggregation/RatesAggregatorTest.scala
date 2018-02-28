@@ -1,4 +1,4 @@
-package com.endor.blockchain.ethereum.tokens.ratesaggregation
+package com.endor.blockchain.ethereum.ratesaggregation
 
 import java.sql.Timestamp
 

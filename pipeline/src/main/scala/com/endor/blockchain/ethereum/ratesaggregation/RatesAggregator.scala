@@ -1,4 +1,4 @@
-package com.endor.blockchain.ethereum.tokens.ratesaggregation
+package com.endor.blockchain.ethereum.ratesaggregation
 
 import org.apache.spark.sql.expressions.UserDefinedAggregateFunction
 import org.apache.spark.sql.types.{DataType, DataTypes, StructType}

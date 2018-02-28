@@ -1,4 +1,4 @@
-package com.endor.blockchain.ethereum.tokens.ratesaggregation
+package com.endor.blockchain.ethereum.ratesaggregation
 
 import java.sql.Timestamp
 
@@ -6,9 +6,9 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.expressions.MutableAggregationBuffer
 import org.apache.spark.sql.types.{DataTypes, StructType}
 
-class CloseRateAggregator extends RatesAggregator {
+class OpenRateAggregator extends RatesAggregator {
   override def bufferSchema: StructType = new StructType()
-    .add("maxDate", DataTypes.TimestampType)
+    .add("minDate", DataTypes.TimestampType)
     .add("rate", DataTypes.DoubleType)
 
   override def initialize(buffer: MutableAggregationBuffer): Unit = {
@@ -18,7 +18,7 @@ class CloseRateAggregator extends RatesAggregator {
 
   override def update(buffer: MutableAggregationBuffer, input: Row): Unit = {
     val newTimestamp = input.getAs[Timestamp](0)
-    if (Option(buffer.getAs[Timestamp](0)).forall(_.before(newTimestamp))) {
+    if (Option(buffer.getAs[Timestamp](0)).forall(_.after(newTimestamp))) {
       buffer.update(0, newTimestamp)
       buffer.update(1, input.getAs[Double](1))
     }
@@ -29,7 +29,7 @@ class CloseRateAggregator extends RatesAggregator {
       Option(buffer2.getAs[Timestamp](0)).map(ts => (ts, buffer2.getAs[Double](1)))
     )
       .flatten
-      .maxBy(_._1.getTime)
+      .minBy(_._1.getTime)
     buffer1.update(0, selectedBuffer._1)
     buffer1.update(1, selectedBuffer._2)
   }
