@@ -91,7 +91,6 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
       .withColumn("date", to_date($"date"))
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill(Map("metaName" -> "n-a", "metaSymbol" -> "n-a", "address" -> "n-a"))
-      .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
     snapshotRates

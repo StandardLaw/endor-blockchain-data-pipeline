@@ -34,7 +34,8 @@ class EthereumRatesAggregationDriver()(implicit spark: SparkSession, datasetStor
 
   private def process(config: EthereumRatesAggregationConfig): Dataset[AggregatedRates] = {
     val aggregatedFacts = aggregateFacts(config)
-    val snapshotRates = datasetStore.loadParquet(config.ratesSnapshotKey.onBoarded)
+    val snapshotRates = datasetStore
+      .loadParquet(config.ratesSnapshotKey.onBoarded)
     snapshotRates
       .union(aggregatedFacts)
   }

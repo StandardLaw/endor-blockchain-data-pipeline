@@ -3,6 +3,7 @@ package com.endor.storage.dataset
 import com.endor.storage.sources._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.{functions => F}
 
 trait DatasetStore {
   protected def doLoadParquet(parquet: DatasetSource[_] with ParquetSourceType): DataFrame
@@ -11,8 +12,17 @@ trait DatasetStore {
   def datasetExists(source: DatasetSource[_]): Boolean
 
   // Parquet Templates
-  final def loadParquet[T : Encoder](parquet: DatasetSource[T] with ParquetSourceType): Dataset[T] =
-    doLoadParquet(parquet).as[T]
+  final def loadParquet[T](parquet: DatasetSource[T] with ParquetSourceType,
+                           withInternal: Boolean = false)
+                          (implicit encoder: Encoder[T]): Dataset[T] = {
+    val rawDf = doLoadParquet(parquet)
+    if (withInternal) {
+      rawDf.as[T]
+    } else {
+      rawDf.select(encoder.schema.map(_.name).map(F.col): _*).as[T]
+    }
+  }
+
   final def loadUntypedParquet(parquet: DataFrameSource with ParquetSourceType): DataFrame =
     doLoadParquet(parquet)
 
