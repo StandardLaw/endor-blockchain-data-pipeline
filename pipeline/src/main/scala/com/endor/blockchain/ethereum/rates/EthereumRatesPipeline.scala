@@ -11,7 +11,7 @@ import org.apache.spark.sql.types.DataTypes
 import play.api.libs.json.{Json, OFormat}
 
 
-final case class RateRow(timestamp: java.sql.Timestamp, price: Double)
+final case class RateRow(timestamp: java.sql.Timestamp, price: Double, marketCap: Double)
 
 object RateRow {
   implicit val encoder: Encoder[RateRow] = Encoders.product[RateRow]
@@ -24,7 +24,7 @@ object EthereumRatesPipelineConfig {
 }
 
 private[rates] final case class RawRateRow(name: String, symbol: String, price_usd: Option[String],
-                                            market_cap_usd: String, last_updated: String)
+                                           market_cap_usd: String, last_updated: String)
 
 class EthereumRatesPipeline()(implicit spark: SparkSession, ioHandler: IOHandler, datasetStore: DatasetStore){
   def run(config: EthereumRatesPipelineConfig): Unit = {
@@ -43,7 +43,8 @@ class EthereumRatesPipeline()(implicit spark: SparkSession, ioHandler: IOHandler
       .where(normalizeNameUdf($"name") equalTo "ethereum")
       .select(
         $"last_updated" cast DataTypes.LongType cast DataTypes.TimestampType as "timestamp",
-        $"price_usd" cast DataTypes.DoubleType as "price"
+        $"price_usd" cast DataTypes.DoubleType as "price",
+        $"market_cap_usd" cast DataTypes.DoubleType as "marketCap"
       )
       .as[RateRow]
 
