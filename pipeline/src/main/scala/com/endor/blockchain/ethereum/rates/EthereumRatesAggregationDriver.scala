@@ -20,7 +20,7 @@ object AggregatedRates {
 
 final case class EthereumRatesAggregationConfig(ratesFactsKey: DataKey[RateRow],
                                                 ratesSnapshotKey: DataKey[AggregatedRates],
-                                                metadataPath: String, outputKey: DataKey[AggregatedRates])
+                                                outputKey: DataKey[AggregatedRates])
 
 object EthereumRatesAggregationConfig {
   implicit val format: OFormat[EthereumRatesAggregationConfig] = Json.format[EthereumRatesAggregationConfig]

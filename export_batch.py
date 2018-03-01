@@ -7,7 +7,6 @@ import logging
 import subprocess
 from tempfile import mkdtemp
 
-import sh
 from functional import seq
 
 LAST_EXPORTED_PATH = '/home/ubuntu/last_exported_ethereum_block'
@@ -29,7 +28,7 @@ def build_export_batches(start_block, end_block, blocks_per_batch):
 def get_last_fetched_block():
     number_regex = re.compile("(?<=number=)(\d+)")
     results = []
-    p = subprocess.Popen('journalctl -u geth --no-pager -n 2', shell=True, stdout=subprocess.PIPE)
+    p = subprocess.Popen('journalctl -u geth --no-pager -n 20', shell=True, stdout=subprocess.PIPE)
     p.wait()
     lines = p.stdout.readlines()
     for line in lines:
@@ -59,12 +58,9 @@ def chunks(l, n):
 
 
 def export_blocks(first_export, last_export):
-    try:
-        LOGGER.debug("Killing geth...")
-        subprocess.call("sudo systemctl stop geth", shell=True)
-        LOGGER.debug("Done")
-    except sh.ErrorReturnCode_1:
-        raise
+    LOGGER.debug("Killing geth...")
+    subprocess.call("sudo systemctl stop geth", shell=True)
+    LOGGER.debug("Done")
     time.sleep(5)
     export_batches = build_export_batches(first_export, last_export, 50)
     export_directory = mkdtemp()
