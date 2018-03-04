@@ -40,7 +40,8 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
                                  (implicit spark: SparkSession, datasetStore: DatasetStore){
 
   def run(config: TokenRatesAggregationConfig): Unit = {
-    datasetStore.storeParquet(config.outputKey.inbox, process(config))
+    val results = process(config)
+    datasetStore.storeParquet(config.outputKey.inbox, results)
   }
 
   private def process(config: TokenRatesAggregationConfig): Dataset[AggregatedRates] = {
@@ -85,14 +86,14 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
     val nameToNameMatch = $"rateName" equalTo $"metaName"
     val nameToSymbolMatch = $"rateName" equalTo $"metaSymbol"
     val symbolToNameMatch = $"rateSymbol" equalTo $"metaName"
-    val snapshotRates = datasetStore.loadParquet(config.ratesSnapshotKey.onBoarded)
+    datasetStore.loadParquet(config.ratesSnapshotKey.onBoarded)
       .na.drop(Seq("date", "open", "high", "low", "close"))
       .withColumn("date", to_date($"date"))
       .join(metadata, nameToNameMatch || nameToSymbolMatch || symbolToNameMatch, "left")
       .na.fill(Map("metaName" -> "n-a", "metaSymbol" -> "n-a", "address" -> "n-a"))
       .where(snapFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
+      .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .as[AggregatedRates]
-    snapshotRates
   }
 }
 
