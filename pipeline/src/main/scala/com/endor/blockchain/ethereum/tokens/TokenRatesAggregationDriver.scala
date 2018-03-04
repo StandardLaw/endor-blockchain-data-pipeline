@@ -13,8 +13,8 @@ import org.apache.spark.sql.functions._
 import play.api.libs.json.{Json, OFormat}
 
 private[tokens] final case class RatesSnapshotRow(rateName: String, rateSymbol: String, date: Option[Timestamp],
-                                          open: Option[Double], high: Option[Double], low: Option[Double],
-                                          close: Option[Double], marketCap: Option[Double])
+                                                  open: Option[Double], high: Option[Double], low: Option[Double],
+                                                  close: Option[Double], marketCap: Option[Double])
 
 object RatesSnapshotRow {
   implicit val encoder: Encoder[RatesSnapshotRow] = Encoders.product[RatesSnapshotRow]

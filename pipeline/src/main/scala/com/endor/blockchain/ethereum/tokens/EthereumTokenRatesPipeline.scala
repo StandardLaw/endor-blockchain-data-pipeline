@@ -12,8 +12,9 @@ import org.apache.spark.sql.types.DataTypes
 import play.api.libs.json.{Json, OFormat}
 
 
-final case class RateRow(rateName: String, rateSymbol: String, price: Double, metaName: Option[String],
-                         metaSymbol: Option[String], address: Option[String], timestamp: java.sql.Timestamp)
+final case class RateRow(rateName: String, rateSymbol: String, price: Double, marketCap: Option[Double],
+                         metaName: Option[String], metaSymbol: Option[String], address: Option[String],
+                         timestamp: java.sql.Timestamp)
 
 object RateRow {
   implicit val encoder: Encoder[RateRow] = Encoders.product[RateRow]
@@ -71,7 +72,6 @@ class EthereumTokenRatesPipeline(tokenListScraper: TokenListScraper)
       .na.fill("n-a")
       .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[RateRow]
-
   }
 }
 
