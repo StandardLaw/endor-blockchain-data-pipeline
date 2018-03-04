@@ -22,7 +22,7 @@ LOGGER.setLevel(logging.DEBUG)
 
 
 def build_export_batches(start_block, end_block, blocks_per_batch):
-    return seq(range(int(math.ceil((end_block - start_block) / float(blocks_per_batch))))).map(lambda x: (x * blocks_per_batch + start_block, min([(x + 1) * blocks_per_batch + start_block - 1, end_block])))
+    return seq(chunks(range(start_block, end_block + 1), blocks_per_batch)).map(lambda x: (min(x), max(x))).to_list()
 
 
 def get_last_fetched_block():
