@@ -58,7 +58,7 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
       val bc = spark.sparkContext.broadcast(tokens.toSet)
       udf(bc.value.contains _)
     }
-    val aggregatedFacts = facts
+    facts
       .groupBy($"rateName", $"rateSymbol", $"address", to_date($"timestamp") as "date")
       .agg(
         first($"metaName") as "metaName",
@@ -72,7 +72,6 @@ class TokenRatesAggregationDriver(tokenListScraper: TokenListScraper)
       .select(AggregatedRates.encoder.schema.map(_.name).map(col): _*)
       .where(factsFilterUdf(trimNameUdf(normalizeNameUdf($"rateName"))))
       .as[AggregatedRates]
-    aggregatedFacts
   }
 
   private def createAggregatedDsFromSnapshotAndMetadata(config: TokenRatesAggregationConfig, tokens: Seq[String]) = {

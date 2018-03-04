@@ -7,8 +7,9 @@ import com.endor.infra.spark.SparkDriverFunSuite
 
 class RatesAggregatorTest extends SparkDriverFunSuite {
   private def generateRandomRow(name: String, symbol: String, address: String): RateRow =
-    RateRow(name, symbol, randomGenerator.nextDouble(), Option(name), Option(symbol), Option(address),
-      randomDate(Timestamp.valueOf("2018-01-01 00:00:00"), Timestamp.valueOf("2018-01-01 23:59:59")))
+    RateRow(name, symbol, randomGenerator.nextDouble(), Option(randomGenerator.nextDouble()), Option(name),
+      Option(symbol), Option(address), randomDate(Timestamp.valueOf("2018-01-01 00:00:00"),
+        Timestamp.valueOf("2018-01-01 23:59:59")))
 
   test("Open rate aggregator") {
     val sess = spark

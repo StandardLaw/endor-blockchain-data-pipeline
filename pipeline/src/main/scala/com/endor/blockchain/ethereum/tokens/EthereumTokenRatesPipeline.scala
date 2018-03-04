@@ -27,7 +27,7 @@ object EthereumTokenRatesPipelineConfig {
 }
 
 private[tokens] final case class RawRateRow(name: String, symbol: String, price_usd: Option[String],
-                                            market_cap_usd: String, last_updated: String)
+                                            market_cap_usd: Option[String], last_updated: String)
 private[tokens] final case class MetadataRow(name: String, symbol: String, address: String)
 
 class EthereumTokenRatesPipeline(tokenListScraper: TokenListScraper)

@@ -57,6 +57,7 @@ class EthereumTokenRatesPipelineTest extends SparkDriverFunSuite {
       .flatMap(rawRow => {
         val currentMetadata = metadata.get(rawRow.name)
         rawRow.price_usd.map(price => RateRow(rawRow.name, rawRow.symbol, price.toDouble,
+          rawRow.market_cap_usd.map(_.toDouble),
           currentMetadata.map(_.name),
           currentMetadata.map(_.symbol),
           currentMetadata.map(_.address),
@@ -74,7 +75,7 @@ class EthereumTokenRatesPipelineTest extends SparkDriverFunSuite {
           val marketCap = randomGenerator.nextInt(1000000)
           (0 to randomGenerator.nextInt(15))
             .map(i => RawRateRow(name, symbol, Option(basePrice + randomGenerator.nextDouble()).map(_.toString),
-              marketCap.toString, firstTs.plus(i * 5L, ChronoUnit.MINUTES).getEpochSecond.toString))
+              Option(marketCap.toString), firstTs.plus(i * 5L, ChronoUnit.MINUTES).getEpochSecond.toString))
       }
   }
 }
