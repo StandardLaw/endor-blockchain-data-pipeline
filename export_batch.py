@@ -78,7 +78,7 @@ def export_logs(first_export, last_export):
     logs_directory = mkdtemp()
     LOGGER.debug("logs directory {}".format(logs_directory))
     logs_export_batches = build_export_batches(first_export, last_export, 1000)
-    for chunk in chunks(logs_export_batches.to_list(), 5):
+    for chunk in chunks(logs_export_batches, 5):
         processes = [start_logs_fetcher(batch[0], batch[1], logs_directory) for batch in chunk]
         for process in processes:
             process.wait()
