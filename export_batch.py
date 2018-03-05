@@ -7,6 +7,7 @@ import logging
 import subprocess
 from tempfile import mkdtemp
 
+import requests
 from functional import seq
 
 LAST_EXPORTED_PATH = '/home/ubuntu/last_exported_ethereum_block'
@@ -62,7 +63,7 @@ def export_blocks(first_export, last_export):
     subprocess.call("sudo systemctl stop geth", shell=True)
     LOGGER.debug("Done")
     time.sleep(5)
-    export_batches = build_export_batches(first_export, last_export, 50)
+    export_batches = build_export_batches(first_export, last_export, 250)
     export_directory = mkdtemp()
     LOGGER.debug("blocks directory {}".format(export_directory))
     for batch_start, batch_end in export_batches:
@@ -91,6 +92,11 @@ def export():
     try:
         first_export = get_last_exported_block() + 1
         last_export = get_last_fetched_block() - 10
+    except:
+        send_to_slack('Could not get export blocks')
+        LOGGER.error("Exception in main", exc_info=True)
+        raise
+    try:
         LOGGER.info("Exporting between {} - {}".format(first_export, last_export))
         logs_directory = export_logs(first_export, last_export)
         blocks_export_directory = export_blocks(first_export, last_export)
@@ -104,8 +110,15 @@ def export():
         LOGGER.info("Removing temp dirs")
         shutil.rmtree(blocks_export_directory)
         shutil.rmtree(logs_directory)
+        send_to_slack('Successfully exported blocks and logs in range {} - {}'.format(first_export, last_export))
     except:
+        send_to_slack('Could not export blocks and logs in range {} - {}'.format(first_export, last_export))
         LOGGER.error("Exception in main", exc_info=True)
+
+
+def send_to_slack(message):
+    requests.post("https://hooks.slack.com/services/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",
+                  json={'text': message})
 
 
 if __name__ == "__main__":
