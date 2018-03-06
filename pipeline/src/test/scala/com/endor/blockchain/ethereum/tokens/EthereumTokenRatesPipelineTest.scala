@@ -15,12 +15,13 @@ trait EthereumTokenRatesPipelineTestComponent extends EthereumTokenRatesPipeline
 }
 
 class EthereumTokenRatesPipelineTest extends SparkDriverFunSuite {
-  private def createContainer(tokenList: Seq[String]): EthereumTokenRatesPipelineTestComponent = new EthereumTokenRatesPipelineTestComponent {
-    override implicit def spark: SparkSession = EthereumTokenRatesPipelineTest.this.spark
+  private def createContainer(tokenList: Seq[String]): EthereumTokenRatesPipelineTestComponent =
+    new EthereumTokenRatesPipelineTestComponent {
+      override implicit def spark: SparkSession = EthereumTokenRatesPipelineTest.this.spark
 
-    @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
-    override def tokenListScraper: EthereumTokensOps.TokenListScraper = () => tokenList
-  }
+      @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
+      override def tokenListScraper: EthereumTokensOps.TokenListScraper = () => tokenList
+    }
 
   test("Basic test") {
     val sparkSession = spark

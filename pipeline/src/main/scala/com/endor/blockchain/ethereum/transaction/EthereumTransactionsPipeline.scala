@@ -38,8 +38,11 @@ class EthereumTransactionsPipeline()
                   transaction.receiveAddress.hex, transaction.gasPrice, transaction.gasLimit,
                   transaction.data.map(_.hex), transaction.hash.hex,
                   transaction.contractAddress.map(_.hex))
-                Seq(original, original.copy(sendAddress = original.receiveAddress,
-                  receiveAddress = original.sendAddress, value = original.value * -1))
+                Seq(
+                  original,
+                  original.copy(sendAddress = original.receiveAddress, receiveAddress = original.sendAddress,
+                    value = original.value * -1)
+                )
             }
       }
   }
