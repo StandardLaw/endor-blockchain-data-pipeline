@@ -17,7 +17,7 @@ class EthereumTransactionsPipelineTest extends SparkDriverFunSuite {
       override implicit def spark: SparkSession = EthereumTransactionsPipelineTest.this.spark
     }
 
-  test("Basic test") {
+  test("Parsing block 5203600") {
     val input_path = getClass.getResource("/com/endor/blockchain/ethereum/blocks/raw/5203600.bin").toString
     val expected_path = getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5203600.parquet").toString
     val container = createContainer()

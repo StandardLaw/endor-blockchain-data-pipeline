@@ -1,3 +1,13 @@
+cache:
+  directories:
+    - $HOME/.m2/repository
+    - $HOME/.sbt
+    - $HOME/.ivy2
+
 language: scala
 scala:
    - 2.11.8
+
+notifications:
+  slack:
+    secure: LM78E3YTHvqdHFOJOGnYQ7AuDWg/v+Jp5NrcQ80SAw+nYnFn+aQ1LwTmIfAU7DUEMS90jMgM+W5Ufn9MUmdQQS1qFOGoXMd69gBZCEx5zlHk3qkXx9EGKHkomGe9UeshCmbuYO0/buHUJricaUGpxBFro9+2lBIMyY3SCscPyQmhrnI613w6QquhDXcuuvV1nk1ZlvPH9YqqpCEdt9FG+8zFhUAnub9QkXZarU3lmSU3HBK4ZvNsqnWw5tx/9vnb+G/p0Lprc5LBEJDSFtN+CG/i8b4jXhQD1vTgoVOv7IeCvVhfHe0hLBmafGXRg/exu2irIpwXjkN4rtGc3IvM+50LzhhqqnfBEqiC3wtfnxH40UBwlgpP+y0AFnS8hegEODelLMZzIQt1QkcVqC8U5zjD+ncHx6ibfRSwwBkwJR8KP1rFkt1ajgHmSBmrkIYRNkQIQZvNSIUbeF9q7/85B5ca2PKRkXQx4Lqz5Eg7tjGeeP8eqmjAVmxUsX3P8wUflKm7KzbIucH5XszwQ8RaO6LJyPf3QIgWvb7z6OPRayfBs/UPbHKpCcddJItfUAdPlDJHPL/JdIsmkiEGW+PqDUPyfrjgc4nvmAqPaZY8ocUikGGsUXf4RYt28PWhRLfcsB5szTbC9vZCCNvEFYtZx3VtWvvIWfQUaDpC307eB44=
