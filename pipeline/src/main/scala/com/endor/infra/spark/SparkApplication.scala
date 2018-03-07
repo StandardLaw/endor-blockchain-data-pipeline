@@ -67,7 +67,6 @@ abstract class SparkApplication[T: Reads] {
       tasksRedis = redisMode.tasks(jobnikSession)
     } yield tasksRedis.exists(s"$jobRole-$jobId-aborted-job")
 
-    // If we don't have jobnik or redis, assume the job is not aborted
     Jobnik.monitor("sparkDriver", 2, 2) {
       val configuration = parseConfiguration(args(3))
       val entryPointConfig = createEntryPointConfig(configuration)
@@ -78,6 +77,7 @@ abstract class SparkApplication[T: Reads] {
         .appName(entryPointConfig.operation)
         .getOrCreate()
 
+      // If we don't have jobnik or redis, assume the job is not aborted
       if (!jobAborted.getOrElse(false)) {
         implicit val endorContext: Context = Context(testMode = testMode)
         spark.withContext(entryPointConfig) {
