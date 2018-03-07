@@ -1,6 +1,8 @@
 // Every once in a while run `sbt dependencyUpdates` and `sbt dependencyCheckAggregate` here
 import Tests._
 
+import scala.io.Source
+
 enablePlugins(GitVersioning)
 git.useGitDescribe := true
 
@@ -63,7 +65,31 @@ lazy val defaultSettings = Seq(
   ),
 
   // This needs to be here for Coursier to be able to resolve the "tests" classifier, otherwise the classifier's ignored
-  classpathTypes += "test-jar"
+  classpathTypes += "test-jar",
+  resourceGenerators in Test += Def.task {
+    def getResourceContents(classpathEntry: Attributed[File], resourceName: String): Option[String] = {
+      classpathEntry.get(artifact.key).map(entryArtifact => {
+        val jarFile = classpathEntry.data
+        IO.withTemporaryDirectory { tmpDir =>
+          IO.unzip(jarFile, tmpDir)
+          // copy to project's target directory
+          // Instead of copying you can do any other stuff here
+          Source.fromFile(tmpDir / resourceName).mkString
+        }
+      })
+    }
+    val contents = (dependencyClasspath in Test).value
+      .filter(_.get(artifact.key) match {
+        case Some(artifactKey) if artifactKey.name == "ethereumj-core" => true
+        case Some(artifactKey) if artifactKey.extraAttributes.get("groupId").contains("org.web3j") && artifactKey.name == "core" => true
+        case _ => false
+      })
+      .flatMap(entry => getResourceContents(entry, "version.properties"))
+      .mkString(System.lineSeparator())
+    val file = (resourceManaged in Compile).value / "version.properties"
+    IO.write(file, contents)
+    Seq(file)
+  }.taskValue
 )
 
 lazy val assemblySettings = Seq(
