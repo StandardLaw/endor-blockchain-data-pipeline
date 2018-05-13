@@ -6,7 +6,8 @@ import scala.io.Source
 enablePlugins(GitVersioning)
 git.useGitDescribe := true
 
-val sparkVersion = "2.2.0"
+val sparkVersion = "2.3.0"
+val elastic4sVersion = "6.2.4"
 val playVersion = "2.6.8"
 val emrProvidedAwsSdkVersion = "1.11.160"
 val emrProvidedHadoopVersion = "2.7.3"
@@ -162,23 +163,28 @@ lazy val pipeline = project.in(file("pipeline"))
     testOptions in Test := Seq()
   )
   .settings(libraryDependencies ++= Seq(
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-hive"                   % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "provided,test",
-    "com.amazonaws"                 % "aws-java-sdk"                 % emrProvidedAwsSdkVersion  % "provided,test",
-    "org.apache.hadoop"             % "hadoop-aws"                   % emrProvidedHadoopVersion  % "provided,test",
-    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "f0e8b3f4c458f08ae4617124471d421b8add6968",
-    "net.debasishg"                %% "redisclient"                  % "3.4",
-    "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
-    "io.logz.logback"               % "logzio-logback-appender"      % "1.0.17"              exclude("com.google.guava", "guava"),
-    "ch.qos.logback"                % "logback-classic"              % "1.2.3",
-    "net.ruippeixotog"             %% "scala-scraper"                % "2.0.0",
+    "org.apache.spark"             %% "spark-core"                      % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-sql"                       % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-hive"                      % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "provided,test",
+    "com.amazonaws"                 % "aws-java-sdk"                    % emrProvidedAwsSdkVersion  % "provided,test",
+    "org.apache.hadoop"             % "hadoop-aws"                      % emrProvidedHadoopVersion  % "provided,test",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"     % "f0e8b3f4c458f08ae4617124471d421b8add6968",
+    "org.elasticsearch"             % "elasticsearch-hadoop"            % "6.2.4",
+    "com.sksamuel.elastic4s"       %% "elastic4s-core"                  % elastic4sVersion,
+    "com.sksamuel.elastic4s"       %% "elastic4s-http"                  % elastic4sVersion,
+    "net.debasishg"                %% "redisclient"                     % "3.4",
+    "com.typesafe.play"            %% "play-json"                       % playVersion               excludeAll(playExclusionRules:_*),
+    "io.logz.logback"               % "logzio-logback-appender"         % "1.0.17"                  exclude("com.google.guava", "guava"),
+    "ch.qos.logback"                % "logback-classic"                 % "1.2.3",
+    "net.ruippeixotog"             %% "scala-scraper"                   % "2.0.0",
 
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "test" classifier "tests",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "test" classifier "tests",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "test" classifier "tests",
-    "org.scalatest"                %% "scalatest"                    % "2.2.6"                   % "test"
+    "org.apache.spark"             %% "spark-core"                      % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-sql"                       % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "test" classifier "tests",
+    "org.scalatest"                %% "scalatest"                       % "2.2.6"                   % "test",
+    "com.sksamuel.elastic4s"       %% "elastic4s-testkit"               % elastic4sVersion          % "test",
+    "com.sksamuel.elastic4s"       %% "elastic4s-embedded"              % elastic4sVersion          % "test"
   ))
 
 lazy val root = project.in(file("."))
