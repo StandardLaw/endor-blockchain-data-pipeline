@@ -9,11 +9,11 @@ import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 import org.elasticsearch.spark.sql._
-import com.endor.serialization._
-import play.api.libs.json.{Json, OFormat}
+import play.api.libs.json.{Format, Json, OFormat}
 
 final case class BlockStats(blockNumber: Long, timestamp: Timestamp, numTx: Int, addresses: Set[String])
 object BlockStats {
+  implicit private val tsFormat: Format[Timestamp] = com.endor.serialization.timestampFormat
   implicit val format: OFormat[BlockStats] = Json.format
   implicit val encoder: Encoder[BlockStats] = Encoders.product
   val esType: String = "BlockStatsV1"
@@ -26,9 +26,9 @@ object BlockStats {
 }
 
 
-  final case class ElasticsearchDataStatsConfig(txKey: DataKey[ProcessedTransaction], elasticsearchIndex: String, esHost: String, esPort: Int)
+final case class ElasticsearchDataStatsConfig(txKey: DataKey[ProcessedTransaction], elasticsearchIndex: String, esHost: String, esPort: Int)
 
-object DataStatsConfig {
+object ElasticsearchDataStatsConfig {
   implicit val format: OFormat[ElasticsearchDataStatsConfig] = Json.format[ElasticsearchDataStatsConfig]
 }
 
