@@ -37,7 +37,7 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       override implicit def spark: SparkSession = ElasticsearchDataStatsReporterTest.this.spark
     }
 
-  test("basic single block test") {
+  test("Test blocks 5609255-5609260") {
     val sess = spark
     import sess.implicits._
     val container = createContainer()
@@ -45,7 +45,7 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
     val Node(client, ip, port) = createNode()
     val dataKey = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDs") )
     val config = ElasticsearchDataStatsConfig(dataKey, "test1", ip, port.toInt)
-    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/multi.parquet").toString
+    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
     val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
     container.datasetStore.storeParquet(dataKey.onBoarded, inputDs)
     container.driver.run(config = config)
@@ -67,7 +67,6 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
     resp match {
       case Right(success) =>
         val results = clientResponseToObjects[BlockStats](success)
-        println(results)
         results should contain theSameElementsAs expected
       case _ =>
     }
