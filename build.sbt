@@ -19,6 +19,10 @@ val playExclusionRules = Seq(
   ExclusionRule("org.slf4j", "jcl-over-slf4j"),
   ExclusionRule("com.typesafe.play", "build-link")
 )
+val scalatestExclusionRules = Seq(
+  ExclusionRule("org.scalatest", "scalatest"),
+  ExclusionRule("org.scalactic", "scalactic")
+)
 
 lazy val defaultSettings = Seq(
   name := "endor-blockchain-data-pipeline",
@@ -124,7 +128,7 @@ lazy val `serialization` = project.in(file("libraries/serialization"))
       "org.joda"                    % "joda-convert"    % "1.9.2",
       "com.typesafe.play"          %% "play-json"       % playVersion   % "provided",
       "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided",
-      "org.scalatest"              %% "scalatest"       % "2.2.6"       % "test"
+      "org.scalatest"              %% "scalatest"       % "3.0.4"       % "test"
     )
   )
 
@@ -147,7 +151,7 @@ lazy val `jobnik-client` = project.in(file("libraries/jobnik-client"))
       "com.typesafe.play"   %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
 
       "ch.qos.logback"       % "logback-classic"              % "1.2.3"                   % "test",
-      "org.scalatest"       %% "scalatest"                    % "2.2.6"                   % "test"
+      "org.scalatest"       %% "scalatest"                    % "3.0.4"                   % "test"
     )
   )
 
@@ -170,7 +174,7 @@ lazy val pipeline = project.in(file("pipeline"))
     "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "provided,test",
     "com.amazonaws"                 % "aws-java-sdk"                    % emrProvidedAwsSdkVersion  % "provided,test",
     "org.apache.hadoop"             % "hadoop-aws"                      % emrProvidedHadoopVersion  % "provided,test",
-    "com.github.EndorCoin"          % "spark-blockchain-datasource"     % "f0e8b3f4c458f08ae4617124471d421b8add6968",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"     % "59b3b74d1a449b59a122f566832d9bb0d0569208",
     "org.elasticsearch"             % "elasticsearch-hadoop"            % "6.2.4",
     "com.sksamuel.elastic4s"       %% "elastic4s-core"                  % elastic4sVersion,
     "com.sksamuel.elastic4s"       %% "elastic4s-http"                  % elastic4sVersion,
@@ -183,7 +187,7 @@ lazy val pipeline = project.in(file("pipeline"))
     "org.apache.spark"             %% "spark-core"                      % sparkVersion              % "test" classifier "tests",
     "org.apache.spark"             %% "spark-sql"                       % sparkVersion              % "test" classifier "tests",
     "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "test" classifier "tests",
-    "org.scalatest"                %% "scalatest"                       % "2.2.6"                   % "test",
+    "org.scalatest"                %% "scalatest"                       % "3.0.4"                   % "test",
     "com.sksamuel.elastic4s"       %% "elastic4s-testkit"               % elastic4sVersion          % "test",
     "com.sksamuel.elastic4s"       %% "elastic4s-embedded"              % elastic4sVersion          % "test"
   ))
