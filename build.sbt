@@ -123,7 +123,8 @@ lazy val `serialization` = project.in(file("libraries/serialization"))
     libraryDependencies ++= Seq(
       "org.joda"                    % "joda-convert"    % "1.9.2",
       "com.typesafe.play"          %% "play-json"       % playVersion   % "provided",
-      "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided"
+      "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided",
+      "org.scalatest"              %% "scalatest"       % "2.2.6"       % "test"
     )
   )
 
