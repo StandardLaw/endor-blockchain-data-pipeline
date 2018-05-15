@@ -11,7 +11,7 @@ import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 import org.elasticsearch.spark.sql._
 import play.api.libs.json.{Format, Json, OFormat}
 
-final case class BlockStats(blockNumber: Long, timestamp: Timestamp, numTx: Int, addresses: Set[String])
+final case class BlockStats(blockNumber: Long, timestamp: Timestamp, numTx: Int, addresses: Seq[String])
 object BlockStats {
   implicit private val tsFormat: Format[Timestamp] = com.endor.serialization.timestampFormat
   implicit val format: OFormat[BlockStats] = Json.format
@@ -21,7 +21,7 @@ object BlockStats {
   def merge(left: BlockStats, right: BlockStats): BlockStats = {
     require(left.blockNumber == right.blockNumber)
     require(left.timestamp == right.timestamp)
-    BlockStats(left.blockNumber, left.timestamp, right.numTx + left.numTx, left.addresses | right.addresses)
+    BlockStats(left.blockNumber, left.timestamp, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
   }
 }
 
@@ -55,7 +55,7 @@ class ElasticsearchDataStatsReporter()
     onBoarded
       .map(
         tx =>
-          BlockStats(tx.blockNumber, tx.timestamp,1,Set(tx.sendAddress))
+          BlockStats(tx.blockNumber, tx.timestamp, 1, Seq(tx.sendAddress))
       )
       .groupByKey(_.blockNumber)
       .reduceGroups(BlockStats.merge _)
@@ -67,7 +67,12 @@ class ElasticsearchDataStatsReporter()
 
   private def storeToES(config: ElasticsearchDataStatsConfig, results: Dataset[BlockStats]): Unit = {
     results.saveToEs(s"${config.elasticsearchIndex}/${BlockStats.esType}",
-      Map("es.nodes" -> config.esHost, "es.port" -> config.esPort.toString))
+      Map(
+        "es.nodes" -> config.esHost,
+        "es.port" -> config.esPort.toString,
+        "es.nodes.wan.only" -> true.toString
+      )
+    )
   }
 }
 

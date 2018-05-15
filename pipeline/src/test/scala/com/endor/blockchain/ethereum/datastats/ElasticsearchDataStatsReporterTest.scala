@@ -58,10 +58,10 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       .groupByKey(_.blockNumber)
       .mapGroups {
         (blockNumber, txIt) =>
-          val a = txIt.foldLeft(BlockStats(blockNumber, ts, 0, Set.empty)) {
-            case (acc, tx) => acc.copy(numTx = acc.numTx + 1, timestamp = tx.timestamp, addresses = acc.addresses + tx.sendAddress)
+          val a = txIt.foldLeft(BlockStats(blockNumber, ts, 0, Seq.empty)) {
+            case (acc, tx) => acc.copy(numTx = acc.numTx + 1, timestamp = tx.timestamp, addresses = acc.addresses :+ tx.sendAddress)
           }
-          a.copy(numTx = a.numTx / 2)
+          a.copy(numTx = a.numTx / 2, addresses = a.addresses.distinct)
       }
     val expected = selfComputed.collect()
     val resp = client.execute {
