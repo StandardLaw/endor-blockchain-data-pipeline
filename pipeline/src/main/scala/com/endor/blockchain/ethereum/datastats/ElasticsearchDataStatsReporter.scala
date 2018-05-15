@@ -1,7 +1,5 @@
 package com.endor.blockchain.ethereum.datastats
 
-import java.sql.Timestamp
-
 import com.endor.DataKey
 import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.SparkSessionComponent
@@ -9,19 +7,18 @@ import com.endor.storage.dataset.{BatchLoadOption, DatasetStore, DatasetStoreCom
 import com.endor.storage.sources._
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 import org.elasticsearch.spark.sql._
-import play.api.libs.json.{Format, Json, OFormat}
+import play.api.libs.json.{Json, OFormat}
 
-final case class BlockStats(blockNumber: Long, timestamp: Timestamp, numTx: Int, addresses: Seq[String])
+final case class BlockStats(blockNumber: Long, date: String, numTx: Int, addresses: Seq[String])
 object BlockStats {
-  implicit private val tsFormat: Format[Timestamp] = com.endor.serialization.timestampFormat
   implicit val format: OFormat[BlockStats] = Json.format
   implicit val encoder: Encoder[BlockStats] = Encoders.product
   val esType: String = "BlockStatsV1"
 
   def merge(left: BlockStats, right: BlockStats): BlockStats = {
     require(left.blockNumber == right.blockNumber)
-    require(left.timestamp == right.timestamp)
-    BlockStats(left.blockNumber, left.timestamp, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
+    require(left.date == right.date)
+    BlockStats(left.blockNumber, left.date, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
   }
 }
 
@@ -55,13 +52,13 @@ class ElasticsearchDataStatsReporter()
     onBoarded
       .map(
         tx =>
-          BlockStats(tx.blockNumber, tx.timestamp, 1, Seq(tx.sendAddress))
+          BlockStats(tx.blockNumber, tx.timestamp.toInstant.toString, 1, Seq(tx.sendAddress))
       )
       .groupByKey(_.blockNumber)
       .reduceGroups(BlockStats.merge _)
       .map(_._2)
       // transactions are counted twice.
-      .map(a => BlockStats(a.blockNumber, a.timestamp, a.numTx/2, a.addresses))
+      .map(results => BlockStats(results.blockNumber, results.date, results.numTx/2, results.addresses))
   }
 
 

@@ -53,13 +53,13 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
     container.datasetStore.storeParquet(dataKey.onBoarded,
       inputDs.withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
     container.driver.run(config = config)
-    val ts = new Timestamp(0)
+    val ts = new Timestamp(0).toInstant.toString
     val selfComputed = inputDs
       .groupByKey(_.blockNumber)
       .mapGroups {
         (blockNumber, txIt) =>
           val a = txIt.foldLeft(BlockStats(blockNumber, ts, 0, Seq.empty)) {
-            case (acc, tx) => acc.copy(numTx = acc.numTx + 1, timestamp = tx.timestamp, addresses = acc.addresses :+ tx.sendAddress)
+            case (acc, tx) => acc.copy(numTx = acc.numTx + 1, date = tx.timestamp.toInstant.toString, addresses = acc.addresses :+ tx.sendAddress)
           }
           a.copy(numTx = a.numTx / 2, addresses = a.addresses.distinct)
       }
@@ -74,5 +74,23 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
         results should contain theSameElementsAs expected
       case _ =>
     }
+  }
+
+  ignore("REMOTE AWS Test blocks 5609255-5609260") {
+    val sess = spark
+    import sess.implicits._
+    val container = createContainer()
+    System.setProperty("es.set.netty.runtime.available.processors", "false")
+    val ip = "https://search-yuvaltest-rhmhcat7ojnadroc2pnqleil5q.us-east-1.es.amazonaws.com"
+    val port = 443
+    val batchId = "my_batch"
+    val dataKey = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDs") )
+    val config = ElasticsearchDataStatsConfig(DatasetDefinition(dataKey, BatchLoadOption.UseExactly(Seq(batchId))),
+      "spark_test1", ip, port.toInt)
+    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
+    val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
+    container.datasetStore.storeParquet(dataKey.onBoarded,
+      inputDs.withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
+    container.driver.run(config = config)
   }
 }
