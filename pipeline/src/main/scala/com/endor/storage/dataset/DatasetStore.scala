@@ -1,9 +1,25 @@
 package com.endor.storage.dataset
 
 import com.endor.storage.sources._
+import com.endor.serialization._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.{functions => F}
+import play.api.libs.json.{Json, OFormat}
+
+sealed trait BatchLoadOption
+
+object BatchLoadOption {
+  case object UseAll extends BatchLoadOption
+  final case class UseExactly(batchIds: Seq[String]) extends BatchLoadOption
+  final case class UseExcept(batchIds: Seq[String]) extends BatchLoadOption
+
+  implicit val format: OFormat[BatchLoadOption] = formatFor(
+    "UseAll" -> UseAll,
+    "UseExactly" -> Json.format[UseExactly],
+    "UseExcept" -> Json.format[UseExcept]
+  )
+}
 
 trait DatasetStore {
   protected def doLoadParquet(parquet: DatasetSource[_] with ParquetSourceType): DataFrame
@@ -13,13 +29,19 @@ trait DatasetStore {
 
   // Parquet Templates
   final def loadParquet[T](parquet: DatasetSource[T] with ParquetSourceType,
-                           withInternal: Boolean = false)
+                           withInternal: Boolean = false,
+                           batchLoadOption: BatchLoadOption = BatchLoadOption.UseAll)
                           (implicit encoder: Encoder[T]): Dataset[T] = {
     val rawDf = doLoadParquet(parquet)
+    val batchFilteredDf = batchLoadOption match {
+      case BatchLoadOption.UseAll => rawDf
+      case BatchLoadOption.UseExactly(batchIds) => rawDf.where(F.col("batch_id") isin(batchIds: _*))
+      case BatchLoadOption.UseExcept(batchIds) => rawDf.where(!F.col("batch_id") isin(batchIds: _*))
+    }
     if (withInternal) {
-      rawDf.as[T]
+      batchFilteredDf.as[T]
     } else {
-      rawDf.select(encoder.schema.map(_.name).map(F.col): _*).as[T]
+      batchFilteredDf.select(encoder.schema.map(_.name).map(F.col): _*).as[T]
     }
   }
 

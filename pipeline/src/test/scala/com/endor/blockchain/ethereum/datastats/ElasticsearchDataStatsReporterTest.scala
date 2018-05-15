@@ -5,13 +5,14 @@ import java.sql.Timestamp
 import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.spark.SparkDriverFunSuite
 import com.endor.infra.{BaseComponent, DIConfiguration}
+import com.endor.storage.dataset.BatchLoadOption
 import com.endor.storage.sources._
 import com.endor.{CustomerId, DataId, DataKey}
 import com.sksamuel.elastic4s.embedded.LocalNode
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.search.SearchResponse
 import com.sksamuel.elastic4s.http.{HttpClient, Response}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SparkSession, functions => F}
 import play.api.libs.json.{Json, Reads}
 
 trait ElasticsearchDataStatsReporterTestComponent extends ElasticsearchDataStatsReporterComponent with BaseComponent {
@@ -43,11 +44,14 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
     val container = createContainer()
     System.setProperty("es.set.netty.runtime.available.processors", "false")
     val Node(client, ip, port) = createNode()
+    val batchId = "my_batch"
     val dataKey = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDs") )
-    val config = ElasticsearchDataStatsConfig(dataKey, "test1", ip, port.toInt)
+    val config = ElasticsearchDataStatsConfig(DatasetDefinition(dataKey, BatchLoadOption.UseExactly(Seq(batchId))),
+      "test1", ip, port.toInt)
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
     val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
-    container.datasetStore.storeParquet(dataKey.onBoarded, inputDs)
+    container.datasetStore.storeParquet(dataKey.onBoarded,
+      inputDs.withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
     container.driver.run(config = config)
     val ts = new Timestamp(0)
     val selfComputed = inputDs

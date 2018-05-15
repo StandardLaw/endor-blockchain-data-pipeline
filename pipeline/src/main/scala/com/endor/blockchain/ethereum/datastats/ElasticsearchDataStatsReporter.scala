@@ -5,7 +5,7 @@ import java.sql.Timestamp
 import com.endor.DataKey
 import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.SparkSessionComponent
-import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
+import com.endor.storage.dataset.{BatchLoadOption, DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 import org.elasticsearch.spark.sql._
@@ -25,8 +25,14 @@ object BlockStats {
   }
 }
 
+final case class DatasetDefinition[T: Encoder](dataKey: DataKey[T], batchLoadOption: BatchLoadOption)
 
-final case class ElasticsearchDataStatsConfig(txKey: DataKey[ProcessedTransaction], elasticsearchIndex: String, esHost: String, esPort: Int)
+object DatasetDefinition {
+  implicit def format[T: Encoder]: OFormat[DatasetDefinition[T]] = Json.format[DatasetDefinition[T]]
+}
+
+final case class ElasticsearchDataStatsConfig(ethereumTxDefinition: DatasetDefinition[ProcessedTransaction],
+                                              elasticsearchIndex: String, esHost: String, esPort: Int)
 
 object ElasticsearchDataStatsConfig {
   implicit val format: OFormat[ElasticsearchDataStatsConfig] = Json.format[ElasticsearchDataStatsConfig]
@@ -44,8 +50,9 @@ class ElasticsearchDataStatsReporter()
   private def process(config: ElasticsearchDataStatsConfig): Dataset[BlockStats] = {
     val sess = spark
     import sess.implicits._
-    val onboarded = datasetStore.loadParquet(config.txKey.onBoarded)
-    onboarded
+    val onBoarded = datasetStore.loadParquet(config.ethereumTxDefinition.dataKey.onBoarded,
+      batchLoadOption = config.ethereumTxDefinition.batchLoadOption)
+    onBoarded
       .map(
         tx =>
           BlockStats(tx.blockNumber, tx.timestamp,1,Set(tx.sendAddress))
