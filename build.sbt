@@ -199,9 +199,8 @@ lazy val incrementVersion = taskKey[Unit]("Creates git tags if needed on master"
 lazy val root = project.in(file("."))
   .settings(defaultSettings)
   .settings(
-    s3Progress in s3Upload := true,
     s3Host in s3Upload := "endor-coin-ci-artifacts.s3.amazonaws.com",
-    publishJar := (s3Upload dependsOn (assembly in (pipeline, assembly))).value,
+    publishJar := (s3Upload dependsOn (assembly in (pipeline, assembly)) dependsOn incrementVersion).value,
     mappings in s3Upload := {
       val jarPath = (assemblyOutputPath in (pipeline, assembly)).value
       val codeVersion = version.value
