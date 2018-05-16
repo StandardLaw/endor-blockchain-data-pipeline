@@ -3,7 +3,7 @@ import Tests._
 
 import scala.io.Source
 
-enablePlugins(GitVersioning)
+enablePlugins(GitVersioning, S3Plugin, GitBranchPrompt)
 git.useGitDescribe := true
 
 val sparkVersion = "2.3.0"
@@ -192,6 +192,20 @@ lazy val pipeline = project.in(file("pipeline"))
     "com.sksamuel.elastic4s"       %% "elastic4s-embedded"              % elastic4sVersion          % "test"
   ))
 
+lazy val deploy = taskKey[Seq[String]]("Deploy fat JAR to S3")
+
 lazy val root = project.in(file("."))
   .settings(defaultSettings)
+  .settings(
+    s3Progress in s3Upload := true,
+    s3Host in s3Upload := "endor-coin-ci-artifacts.s3.amazonaws.com",
+    deploy := (s3Upload dependsOn (assembly in (pipeline, assembly))).value,
+    mappings in s3Upload := {
+      val jarPath = (assemblyOutputPath in (pipeline, assembly)).value
+      val codeVersion = version.value
+      val minorVersion = codeVersion.split("\\.").take(2).mkString(".")
+      Seq((jarPath, s"pipeline/$minorVersion/$codeVersion/pipeline-$codeVersion.jar"))
+      Seq.empty
+    }
+)
   .aggregate(pipeline, `jobnik-client`, `serialization`)
