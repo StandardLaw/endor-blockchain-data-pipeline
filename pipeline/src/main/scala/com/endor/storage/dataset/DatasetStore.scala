@@ -36,7 +36,7 @@ trait DatasetStore {
     val batchFilteredDf = batchLoadOption match {
       case BatchLoadOption.UseAll => rawDf
       case BatchLoadOption.UseExactly(batchIds) => rawDf.where(F.col("batch_id") isin(batchIds: _*))
-      case BatchLoadOption.UseExcept(batchIds) => rawDf.where(!F.col("batch_id") isin(batchIds: _*))
+      case BatchLoadOption.UseExcept(batchIds) => rawDf.where(!(F.col("batch_id") isin(batchIds: _*)))
     }
     if (withInternal) {
       batchFilteredDf.as[T]

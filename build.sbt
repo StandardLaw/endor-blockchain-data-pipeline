@@ -1,9 +1,10 @@
 // Every once in a while run `sbt dependencyUpdates` and `sbt dependencyCheckAggregate` here
 import Tests._
+import com.typesafe.sbt.git.ConsoleGitRunner
 
 import scala.io.Source
 
-enablePlugins(GitVersioning, S3Plugin, GitBranchPrompt)
+enablePlugins(GitVersioning, S3Plugin, GitBranchPrompt, GitPlugin)
 git.useGitDescribe := true
 
 val sparkVersion = "2.3.0"
@@ -192,20 +193,40 @@ lazy val pipeline = project.in(file("pipeline"))
     "com.sksamuel.elastic4s"       %% "elastic4s-embedded"              % elastic4sVersion          % "test"
   ))
 
-lazy val deploy = taskKey[Seq[String]]("Deploy fat JAR to S3")
+lazy val publishJar = taskKey[Seq[String]]("Deploy fat JAR to S3")
+lazy val incrementVersion = taskKey[Unit]("Creates git tags if needed on master")
 
 lazy val root = project.in(file("."))
   .settings(defaultSettings)
   .settings(
     s3Progress in s3Upload := true,
     s3Host in s3Upload := "endor-coin-ci-artifacts.s3.amazonaws.com",
-    deploy := (s3Upload dependsOn (assembly in (pipeline, assembly))).value,
+    publishJar := (s3Upload dependsOn (assembly in (pipeline, assembly))).value,
     mappings in s3Upload := {
       val jarPath = (assemblyOutputPath in (pipeline, assembly)).value
       val codeVersion = version.value
       val minorVersion = codeVersion.split("\\.").take(2).mkString(".")
+      val gitBranch = ConsoleGitRunner.apply("rev-parse", "--abbrev-ref", "HEAD": _*)(file("."))
       Seq((jarPath, s"pipeline/$minorVersion/$codeVersion/pipeline-$codeVersion.jar"))
-      Seq.empty
+        .filter(_ => gitBranch == "master" || sys.env.get("PUBLISH").exists(_.toBoolean))
+    },
+    incrementVersion := {
+      def gitCommand(args: String *): Option[String] = {
+        Option(ConsoleGitRunner.apply(args: _*)(file(".")))
+      }
+
+      val versionRegex = """(\d+)\.(\d+)\.(\d+)-\d+-g[\da-f]+(-SNAPSHOT)?""".r
+
+      gitCommand("rev-parse", "--abbrev-ref", "HEAD")
+        .filter(_ == "master")
+        .map(_ => version.value)
+        .collect {
+          case versionRegex(major, minor, patch, _) => s"$major.$minor.${patch.toInt + 1}"
+        }
+        .foreach(newVersion => {
+          gitCommand("tag", newVersion)
+          gitCommand("push", "--tags")
+        })
     }
 )
   .aggregate(pipeline, `jobnik-client`, `serialization`)
