@@ -1,5 +1,8 @@
 package com.endor
 
+import java.sql.Timestamp
+import java.time.Instant
+
 import org.joda.time.DateTime
 import play.api.libs.json._
 
@@ -10,6 +13,14 @@ package object serialization {
 
   lazy val dateTimeFormat: Format[DateTime] =
     Format(JodaReads.jodaDateReads(dateFormat), JodaWrites.jodaDateWrites(dateFormat))
+
+  implicit lazy val timestampFormat: Format[Timestamp] = new Format[Timestamp] {
+    private val instantFormat = implicitly[Format[Instant]]
+
+    override def writes(o: Timestamp): JsValue = instantFormat.writes(o.toInstant)
+
+    override def reads(json: JsValue): JsResult[Timestamp] = instantFormat.reads(json).map(Timestamp.from)
+  }
 
   implicit def pairToSerializableADTClass[Parent, T <: Parent : ClassTag](pair: (String, OFormat[T])):
     SerializableADTClass[Parent, T] = {

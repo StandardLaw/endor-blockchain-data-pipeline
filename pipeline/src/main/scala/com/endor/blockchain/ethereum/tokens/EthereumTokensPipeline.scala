@@ -138,7 +138,8 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
             row.getAs[String]("value").bytes,
             row.getAs[Long]("blockNumber"),
             row.getAs[String]("transactionHash").bytes,
-            row.getAs[Long]("transactionIndex").toInt
+            row.getAs[Long]("transactionIndex").toInt,
+            0
           )
       }
     val metadataDs = spark

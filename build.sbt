@@ -1,12 +1,14 @@
 // Every once in a while run `sbt dependencyUpdates` and `sbt dependencyCheckAggregate` here
 import Tests._
+import com.typesafe.sbt.git.ConsoleGitRunner
 
 import scala.io.Source
 
-enablePlugins(GitVersioning)
+enablePlugins(GitVersioning, S3Plugin, GitBranchPrompt, GitPlugin)
 git.useGitDescribe := true
 
-val sparkVersion = "2.2.0"
+val sparkVersion = "2.3.0"
+val elastic4sVersion = "6.2.4"
 val playVersion = "2.6.8"
 val emrProvidedAwsSdkVersion = "1.11.160"
 val emrProvidedHadoopVersion = "2.7.3"
@@ -17,6 +19,10 @@ val playExclusionRules = Seq(
   ExclusionRule("org.slf4j", "slf4j-api"),
   ExclusionRule("org.slf4j", "jcl-over-slf4j"),
   ExclusionRule("com.typesafe.play", "build-link")
+)
+val scalatestExclusionRules = Seq(
+  ExclusionRule("org.scalatest", "scalatest"),
+  ExclusionRule("org.scalactic", "scalactic")
 )
 
 lazy val defaultSettings = Seq(
@@ -122,7 +128,8 @@ lazy val `serialization` = project.in(file("libraries/serialization"))
     libraryDependencies ++= Seq(
       "org.joda"                    % "joda-convert"    % "1.9.2",
       "com.typesafe.play"          %% "play-json"       % playVersion   % "provided",
-      "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided"
+      "com.typesafe.play"          %% "play-json-joda"  % playVersion   % "provided",
+      "org.scalatest"              %% "scalatest"       % "3.0.4"       % "test"
     )
   )
 
@@ -145,7 +152,7 @@ lazy val `jobnik-client` = project.in(file("libraries/jobnik-client"))
       "com.typesafe.play"   %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
 
       "ch.qos.logback"       % "logback-classic"              % "1.2.3"                   % "test",
-      "org.scalatest"       %% "scalatest"                    % "2.2.6"                   % "test"
+      "org.scalatest"       %% "scalatest"                    % "3.0.4"                   % "test"
     )
   )
 
@@ -162,25 +169,63 @@ lazy val pipeline = project.in(file("pipeline"))
     testOptions in Test := Seq()
   )
   .settings(libraryDependencies ++= Seq(
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-hive"                   % sparkVersion              % "provided,test",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "provided,test",
-    "com.amazonaws"                 % "aws-java-sdk"                 % emrProvidedAwsSdkVersion  % "provided,test",
-    "org.apache.hadoop"             % "hadoop-aws"                   % emrProvidedHadoopVersion  % "provided,test",
-    "com.github.EndorCoin"          % "spark-blockchain-datasource"  % "f0e8b3f4c458f08ae4617124471d421b8add6968",
-    "net.debasishg"                %% "redisclient"                  % "3.4",
-    "com.typesafe.play"            %% "play-json"                    % playVersion               excludeAll(playExclusionRules:_*),
-    "io.logz.logback"               % "logzio-logback-appender"      % "1.0.17"              exclude("com.google.guava", "guava"),
-    "ch.qos.logback"                % "logback-classic"              % "1.2.3",
-    "net.ruippeixotog"             %% "scala-scraper"                % "2.0.0",
+    "org.apache.spark"             %% "spark-core"                      % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-sql"                       % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-hive"                      % sparkVersion              % "provided,test",
+    "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "provided,test",
+    "com.amazonaws"                 % "aws-java-sdk"                    % emrProvidedAwsSdkVersion  % "provided,test",
+    "org.apache.hadoop"             % "hadoop-aws"                      % emrProvidedHadoopVersion  % "provided,test",
+    "com.github.EndorCoin"          % "spark-blockchain-datasource"     % "59b3b74d1a449b59a122f566832d9bb0d0569208",
+    "org.elasticsearch"             % "elasticsearch-hadoop"            % "6.2.4",
+    "com.sksamuel.elastic4s"       %% "elastic4s-core"                  % elastic4sVersion,
+    "com.sksamuel.elastic4s"       %% "elastic4s-http"                  % elastic4sVersion,
+    "net.debasishg"                %% "redisclient"                     % "3.4",
+    "com.typesafe.play"            %% "play-json"                       % playVersion               excludeAll(playExclusionRules:_*),
+    "io.logz.logback"               % "logzio-logback-appender"         % "1.0.17"                  exclude("com.google.guava", "guava"),
+    "ch.qos.logback"                % "logback-classic"                 % "1.2.3",
+    "net.ruippeixotog"             %% "scala-scraper"                   % "2.0.0",
 
-    "org.apache.spark"             %% "spark-core"                   % sparkVersion              % "test" classifier "tests",
-    "org.apache.spark"             %% "spark-sql"                    % sparkVersion              % "test" classifier "tests",
-    "org.apache.spark"             %% "spark-catalyst"               % sparkVersion              % "test" classifier "tests",
-    "org.scalatest"                %% "scalatest"                    % "2.2.6"                   % "test"
+    "org.apache.spark"             %% "spark-core"                      % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-sql"                       % sparkVersion              % "test" classifier "tests",
+    "org.apache.spark"             %% "spark-catalyst"                  % sparkVersion              % "test" classifier "tests",
+    "org.scalatest"                %% "scalatest"                       % "3.0.4"                   % "test",
+    "com.sksamuel.elastic4s"       %% "elastic4s-testkit"               % elastic4sVersion          % "test",
+    "com.sksamuel.elastic4s"       %% "elastic4s-embedded"              % elastic4sVersion          % "test"
   ))
+
+lazy val publishJar = taskKey[Seq[String]]("Deploy fat JAR to S3")
+lazy val incrementVersion = taskKey[Unit]("Creates git tags if needed on master")
 
 lazy val root = project.in(file("."))
   .settings(defaultSettings)
+  .settings(
+    s3Host in s3Upload := "endor-coin-ci-artifacts.s3.amazonaws.com",
+    publishJar := (s3Upload dependsOn (assembly in (pipeline, assembly)) dependsOn incrementVersion).value,
+    mappings in s3Upload := {
+      val jarPath = (assemblyOutputPath in (pipeline, assembly)).value
+      val codeVersion = version.value
+      val minorVersion = codeVersion.split("\\.").take(2).mkString(".")
+      val gitBranch = ConsoleGitRunner.apply("rev-parse", "--abbrev-ref", "HEAD")(file("."))
+      Seq((jarPath, s"pipeline/$minorVersion/$codeVersion/pipeline-$codeVersion.jar"))
+        .filter(_ => gitBranch == "master" || sys.env.get("PUBLISH").exists(_.toBoolean))
+    },
+    incrementVersion := {
+      def gitCommand(args: String *): Option[String] = {
+        Option(ConsoleGitRunner.apply(args: _*)(file(".")))
+      }
+
+      val versionRegex = """(\d+)\.(\d+)\.(\d+)-\d+-g[\da-f]+(-SNAPSHOT)?""".r
+
+      gitCommand("rev-parse", "--abbrev-ref", "HEAD")
+        .filter(_ == "master")
+        .map(_ => version.value)
+        .collect {
+          case versionRegex(major, minor, patch, _) => s"$major.$minor.${patch.toInt + 1}"
+        }
+        .foreach(newVersion => {
+          gitCommand("tag", newVersion)
+          gitCommand("push", "--tags")
+        })
+    }
+)
   .aggregate(pipeline, `jobnik-client`, `serialization`)
