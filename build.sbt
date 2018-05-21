@@ -205,9 +205,7 @@ lazy val root = project.in(file("."))
       val jarPath = (assemblyOutputPath in (pipeline, assembly)).value
       val codeVersion = version.value
       val minorVersion = codeVersion.split("\\.").take(2).mkString(".")
-      val gitBranch = ConsoleGitRunner.apply("rev-parse", "--abbrev-ref", "HEAD")(file("."))
       Seq((jarPath, s"pipeline/$minorVersion/$codeVersion/pipeline-$codeVersion.jar"))
-        .filter(_ => gitBranch == "master" || sys.env.get("PUBLISH").exists(_.toBoolean))
     },
     incrementVersion := {
       def gitCommand(args: String *): Option[String] = {
