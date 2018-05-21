@@ -9,12 +9,13 @@ import com.endor.infra.spark.SparkDriverFunSuite
 import com.endor.infra.{BaseComponent, DIConfiguration}
 import com.endor.storage.sources._
 import org.apache.spark.sql.SparkSession
+import org.scalatest.FunSuite
 
 trait EthereumTokenRatesPipelineTestComponent extends EthereumTokenRatesPipelineComponent with BaseComponent {
   override val diConfiguration: DIConfiguration = DIConfiguration.ALL_IN_MEM
 }
 
-class EthereumTokenRatesPipelineTest extends SparkDriverFunSuite {
+class EthereumTokenRatesPipelineTest extends FunSuite with SparkDriverFunSuite {
   private def createContainer(tokenList: Seq[String]): EthereumTokenRatesPipelineTestComponent =
     new EthereumTokenRatesPipelineTestComponent {
       override implicit def spark: SparkSession = EthereumTokenRatesPipelineTest.this.spark

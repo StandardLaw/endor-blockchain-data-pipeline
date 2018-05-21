@@ -4,8 +4,9 @@ import java.sql.Timestamp
 
 import com.endor.blockchain.ethereum.tokens.RateRow
 import com.endor.infra.spark.SparkDriverFunSuite
+import org.scalatest.FunSuite
 
-class RatesAggregatorTest extends SparkDriverFunSuite {
+class RatesAggregatorTest extends FunSuite with SparkDriverFunSuite {
   private def generateRandomRow(name: String, symbol: String, address: String): RateRow =
     RateRow(name, symbol, randomGenerator.nextDouble(), Option(randomGenerator.nextDouble()), Option(name),
       Option(symbol), Option(address), randomDate(Timestamp.valueOf("2018-01-01 00:00:00"),

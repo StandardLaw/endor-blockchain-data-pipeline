@@ -5,8 +5,8 @@ import java.nio.file.{Path, Paths}
 import java.sql.Timestamp
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.test.SharedSQLContext
-import org.scalatest.{BeforeAndAfterEachTestData, Matchers, TestData}
+import org.apache.spark.sql.test.SharedSparkSession
+import org.scalatest.{BeforeAndAfterEachTestData, Matchers, Suite, TestData}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -14,7 +14,9 @@ import scala.util.Random
 /**
   * Created by user on 14/05/17.
   */
-trait SparkDriverFunSuite extends SharedSQLContext with Matchers with BeforeAndAfterEachTestData {
+trait SparkDriverFunSuite extends SharedSparkSession with Matchers with BeforeAndAfterEachTestData {
+  this: Suite =>
+
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var _randomSeed: Long = Random.nextLong()
   protected def randomSeed: Long = _randomSeed
@@ -63,6 +65,8 @@ trait SparkDriverFunSuite extends SharedSQLContext with Matchers with BeforeAndA
 }
 
 trait IsolatedSparkDriverFunSuite extends SparkDriverFunSuite {
+  this: Suite =>
+
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   protected var _isolatedSpark: SparkSession = super.spark
   override def spark: SparkSession = _isolatedSpark

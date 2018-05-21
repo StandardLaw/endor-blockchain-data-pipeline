@@ -7,6 +7,7 @@ import com.endor.infra.spark.SparkDriverFunSuite
 import com.endor.storage.io.LocalIOHandler
 import com.endor.storage.sources._
 import org.apache.spark.sql.{Encoder, Encoders, functions => F}
+import org.scalatest.FunSuite
 
 final case class Person(name: String, age: Int)
 
@@ -14,7 +15,7 @@ object Person {
   implicit val encoder: Encoder[Person] = Encoders.product[Person]
 }
 
-class FileSystemDatasetStoreTest extends SparkDriverFunSuite {
+class FileSystemDatasetStoreTest extends FunSuite with SparkDriverFunSuite {
   test("Loading a dataset without internal should return exactly the same columns as the dataset's type") {
     val data = (0 to 10).map(_ => Person(randomString(10), randomGenerator.nextInt()))
     val ds = spark.createDataset(data)

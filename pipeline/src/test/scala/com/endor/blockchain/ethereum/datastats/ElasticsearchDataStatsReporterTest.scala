@@ -14,43 +14,54 @@ import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.search.SearchResponse
 import com.sksamuel.elastic4s.http.{HttpClient, Response}
 import org.apache.spark.sql.{Dataset, SparkSession, functions => F}
+import org.scalatest.{EitherValues, Outcome, fixture}
 import play.api.libs.json.{Json, Reads}
 
 trait ElasticsearchDataStatsReporterTestComponent extends ElasticsearchDataStatsReporterComponent with BaseComponent {
   override val diConfiguration: DIConfiguration = DIConfiguration.ALL_IN_MEM
 }
 
-class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
-
+class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriverFunSuite with EitherValues {
   case class Node(client: HttpClient, ip: String, port: String)
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    System.setProperty("es.set.netty.runtime.available.processors", "false")
+  }
+
+  override protected def withFixture(test: OneArgTest): Outcome = {
+    val node = createNode()
+    try {
+      test(node)
+    }
+    finally node.client.close()
+  }
+  override type FixtureParam = Node
   private def clientResponseToObjects[T: Reads](response: Response[SearchResponse]): Seq[T] = {
     response.result.hits.hits.map(_.sourceAsString).map(Json.parse).map(_.as[T])
   }
-
   private def createNode(): Node = {
     val localNode = LocalNode("testcluster", createTempDir(randomString(10)))
     val client: HttpClient = localNode.http(true)
     val Array(ip, port) = localNode.ipAndPort.split(":")
     Node(client, ip, port)
   }
-
   private def createContainer(): ElasticsearchDataStatsReporterTestComponent =
     new ElasticsearchDataStatsReporterTestComponent {
       override implicit def spark: SparkSession = ElasticsearchDataStatsReporterTest.this.spark
     }
 
-  test("Test tansactions blocks 5609255-5609260") {
+  test("Test tansactions blocks 5609255-5609260") { node =>
     val sess = spark
     import sess.implicits._
     val container = createContainer()
-    System.setProperty("es.set.netty.runtime.available.processors", "false")
-    val Node(client, ip, port) = createNode()
     val batchId = "my_batch"
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDsTransaction"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer"), DataId("testDsRates"))
-    val config = ElasticsearchDataStatsConfig(DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
-      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))), "test1", ip, port.toInt)
+    val config = ElasticsearchDataStatsConfig(
+      DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
+      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
+      "test1", node.ip, node.port.toInt)
 
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
     val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
@@ -73,17 +84,11 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       }
 
     val expected = selfComputed.collect()
-    val resp = client.execute {
+    val resp = node.client.execute {
       searchWithType(config.elasticsearchIndex / implicitly[EsType[BlockStatsV1]].esType) limit expected.length + 1
     }.await
-    resp.isRight should be(true)
-    resp match {
-      case Right(success) =>
-        val results = clientResponseToObjects[BlockStatsV1](success)
-        results should contain theSameElementsAs expected
-      case _ =>
-    }
-    client.close()
+    clientResponseToObjects[BlockStatsV1](resp.right.value) should contain theSameElementsAs expected
+
   }
 
   private def runAndCompare(inputDs: Dataset[AggregatedRates], container: ElasticsearchDataStatsReporterTestComponent,
@@ -109,12 +114,11 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       case _ =>
     }
   }
-  test("Basic: Test rates single day") {
+  test("Basic: Test rates single day") { node =>
     val sess = spark
     import sess.implicits._
     val container = createContainer()
     System.setProperty("es.set.netty.runtime.available.processors", "false")
-    val Node(client, ip, port) = createNode()
     val batchId = "my_batch_basic"
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerBasic: Test rates single Day"), DataId("testDsTransactionBasic: Test rates single Day"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer1"), DataId("testDsRates1"))
@@ -123,22 +127,21 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       .withColumn("date", F.to_date($"date", "yyyy-MM-dd"))
       .as[AggregatedRates]
 
-    val configFirst = ElasticsearchDataStatsConfig(DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
-      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))), "test1", ip, port.toInt)
+    val configFirst = ElasticsearchDataStatsConfig(
+      DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
+      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
+      "test1", node.ip, node.port.toInt)
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
       spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
-    runAndCompare(inputDs, container, configFirst, dataKeyRates, "2019-01-01", client, batchId)
-    client.close()
-
+    runAndCompare(inputDs, container, configFirst, dataKeyRates, "2019-01-01", node.client, batchId)
   }
 
-  test("Advanced: Test rates with Maxdate") {
+  test("Advanced: Test rates with Maxdate") { node =>
     // init
     val sess = spark
     import sess.implicits._
     val container = createContainer()
     System.setProperty("es.set.netty.runtime.available.processors", "false")
-    val Node(client, ip, port) = createNode()
     val batchId = "my_batch"
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerAdvanced: Test rates with Maxdate"),
       DataId("testDsTransactionAdvanced: Test rates with Maxdate"))
@@ -149,16 +152,19 @@ class ElasticsearchDataStatsReporterTest extends SparkDriverFunSuite {
       .as[AggregatedRates]
 
 
-    val configFirst = ElasticsearchDataStatsConfig(DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
-      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))), "test1", ip, port.toInt)
+    val configFirst = ElasticsearchDataStatsConfig(
+      DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
+      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
+      "test1", node.ip, node.port.toInt)
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
       spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
-    runAndCompare(inputDs, container, configFirst, dataKeyRates, "2016-01-01", client, batchId)
+    runAndCompare(inputDs, container, configFirst, dataKeyRates, "2016-01-01", node.client, batchId)
 
 
-    val configSecond = ElasticsearchDataStatsConfig(DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
-      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))), "test2", ip, port.toInt)
-    runAndCompare(inputDs, container, configSecond, dataKeyRates, "2017-01-01", client, batchId)
-    client.close()
+    val configSecond = ElasticsearchDataStatsConfig(
+      DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
+      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
+      "test2", node.ip, node.port.toInt)
+    runAndCompare(inputDs, container, configSecond, dataKeyRates, "2017-01-01", node.client, batchId)
   }
 }
