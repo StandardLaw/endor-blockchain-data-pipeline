@@ -1,6 +1,6 @@
 package com.endor.blockchain.ethereum.datastats
 
-import java.sql.{Date}
+import java.sql.{Date, Timestamp}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -113,8 +113,10 @@ class ElasticsearchDataStatsReporter()
 
   private def storeToES[T: Encoder: ClassTag](config: ElasticsearchDataStatsConfig, results: Dataset[T])
                                              (implicit esType: EsType[T]): Unit = {
-    // TODO: add publish_timestamp.
-    results.saveToEs(s"${config.elasticsearchIndex}/${esType.esType}",
+    val now_ts = Timestamp.from(Instant.now())
+    val withTS = results.withColumn("published_on",F.lit(now_ts))
+
+    withTS.saveToEs(s"${config.elasticsearchIndex}/${esType.esType}",
       createEsConfig(config)
     )
   }
