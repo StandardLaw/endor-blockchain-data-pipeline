@@ -5,7 +5,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 import com.endor._
-import com.endor.infra.spark.SparkDriverFunSuite
+import com.endor.infra.spark.SparkDriverSuite
 import com.endor.infra.{BaseComponent, DIConfiguration}
 import com.endor.storage.sources._
 import org.apache.spark.sql.SparkSession
@@ -15,7 +15,7 @@ trait EthereumTokenRatesPipelineTestComponent extends EthereumTokenRatesPipeline
   override val diConfiguration: DIConfiguration = DIConfiguration.ALL_IN_MEM
 }
 
-class EthereumTokenRatesPipelineTest extends FunSuite with SparkDriverFunSuite {
+class EthereumTokenRatesPipelineTest extends FunSuite with SparkDriverSuite {
   private def createContainer(tokenList: Seq[String]): EthereumTokenRatesPipelineTestComponent =
     new EthereumTokenRatesPipelineTestComponent {
       override implicit def spark: SparkSession = EthereumTokenRatesPipelineTest.this.spark

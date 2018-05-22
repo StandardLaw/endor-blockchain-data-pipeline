@@ -14,7 +14,7 @@ import scala.util.Random
 /**
   * Created by user on 14/05/17.
   */
-trait SparkDriverFunSuite extends SharedSparkSession with Matchers with BeforeAndAfterEachTestData {
+trait SparkDriverSuite extends SharedSparkSession with Matchers with BeforeAndAfterEachTestData {
   this: Suite =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -64,7 +64,7 @@ trait SparkDriverFunSuite extends SharedSparkSession with Matchers with BeforeAn
   }
 }
 
-trait IsolatedSparkDriverFunSuite extends SparkDriverFunSuite {
+trait IsolatedSparkDriverSuite extends SparkDriverSuite {
   this: Suite =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))

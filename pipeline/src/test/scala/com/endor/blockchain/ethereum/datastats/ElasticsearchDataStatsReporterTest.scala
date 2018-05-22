@@ -4,7 +4,7 @@ import java.sql.{Date, Timestamp}
 
 import com.endor.blockchain.ethereum.tokens.AggregatedRates
 import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
-import com.endor.infra.spark.SparkDriverFunSuite
+import com.endor.infra.spark.SparkDriverSuite
 import com.endor.infra.{BaseComponent, DIConfiguration}
 import com.endor.storage.dataset.BatchLoadOption
 import com.endor.storage.sources._
@@ -21,7 +21,7 @@ trait ElasticsearchDataStatsReporterTestComponent extends ElasticsearchDataStats
   override val diConfiguration: DIConfiguration = DIConfiguration.ALL_IN_MEM
 }
 
-class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriverFunSuite with EitherValues {
+class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriverSuite with EitherValues {
   case class Node(client: HttpClient, ip: String, port: String)
 
   override def beforeAll(): Unit = {
