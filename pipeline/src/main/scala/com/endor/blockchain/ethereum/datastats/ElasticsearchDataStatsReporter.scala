@@ -116,7 +116,7 @@ class ElasticsearchDataStatsReporter()
     val now_ts = Timestamp.from(Instant.now())
     val withTS = results.withColumn("published_on",F.lit(now_ts))
 
-    withTS.saveToEs(s"${config.elasticsearchIndex}/${esType.esType}",
+    withTS.coalesce(10).saveToEs(s"${config.elasticsearchIndex}/${esType.esType}",
       createEsConfig(config)
     )
   }
