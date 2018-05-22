@@ -2,7 +2,7 @@ package com.endor.infra.spark
 
 import java.io.File
 import java.nio.file.{Path, Paths}
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.test.SharedSparkSession
@@ -61,6 +61,10 @@ trait SparkDriverSuite extends SharedSparkSession with Matchers with BeforeAndAf
     val newTempDir = tmpDir.resolve(name)
     tempDirs += newTempDir.toFile
     newTempDir.toString
+  }
+
+  implicit final class TimestampOps(ts: Timestamp) {
+    def toDate: Date = Date.valueOf(ts.toLocalDateTime.toLocalDate)
   }
 }
 
