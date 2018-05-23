@@ -77,7 +77,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
       .groupByKey(_.blockNumber)
       .mapGroups {
         (blockNumber, txIt) =>
-          val a = txIt.foldLeft(BlockStatsV1(blockNumber, ts, 0, Seq.empty)) {
+          val a = txIt.foldLeft(EthereumBlockStatsV1(blockNumber, ts, 0, Seq.empty)) {
             case (acc, tx) => acc.copy(numTx = acc.numTx + 1, date = tx.timestamp.toInstant.toString, addresses = acc.addresses :+ tx.sendAddress)
           }
           a.copy(numTx = a.numTx / 2, addresses = a.addresses.distinct)
@@ -85,9 +85,10 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
 
     val expected = selfComputed.collect()
     val resp = node.client.execute {
-      searchWithType(config.elasticsearchIndex / implicitly[EsType[BlockStatsV1]].esType) limit expected.length + 1
+      val esType = implicitly[EsType[EthereumBlockStatsV1]]
+      searchWithType(esType.indexName / esType.typeVersion) limit expected.length + 1
     }.await
-    clientResponseToObjects[BlockStatsV1](resp.right.value) should contain theSameElementsAs expected
+    clientResponseToObjects[EthereumBlockStatsV1](resp.right.value) should contain theSameElementsAs expected
 
   }
 
@@ -104,13 +105,15 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
 
 
     val respFirst = client.execute {
-      searchWithType(config.elasticsearchIndex / implicitly[EsType[AggregatedRates]].esType) limit inputDSFirst.count().toInt + 100
+      val esType = implicitly[EsType[AggregatedRates]]
+      searchWithType(esType.indexName / esType.typeVersion) limit inputDSFirst.count().toInt + 100
     }.await
     respFirst.isRight should be(true)
     respFirst match {
       case Right(success) =>
-        val results1 = clientResponseToObjects[AggregatedRates](success)
-        results1 should contain theSameElementsAs inputDSFirst.collect()
+        val results = clientResponseToObjects[AggregatedRates](success)
+        val expected = inputDSFirst.collect()
+        results should contain theSameElementsAs expected
       case _ =>
     }
   }

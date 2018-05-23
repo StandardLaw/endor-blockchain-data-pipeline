@@ -10,6 +10,7 @@ import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{BatchLoadOption, DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._
+import org.apache.spark.sql.types.DataTypes
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession, functions => F}
 import org.elasticsearch.hadoop.EsHadoopIllegalArgumentException
 import org.elasticsearch.spark.sql._
@@ -18,15 +19,15 @@ import play.api.libs.json.{Json, OFormat}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-final case class BlockStatsV1(blockNumber: Long, date: String, numTx: Int, addresses: Seq[String])
-object BlockStatsV1 {
-  implicit val format: OFormat[BlockStatsV1] = Json.format
-  implicit val encoder: Encoder[BlockStatsV1] = Encoders.product
+final case class EthereumBlockStatsV1(blockNumber: Long, date: String, numTx: Int, addresses: Seq[String])
+object EthereumBlockStatsV1 {
+  implicit val format: OFormat[EthereumBlockStatsV1] = Json.format
+  implicit val encoder: Encoder[EthereumBlockStatsV1] = Encoders.product
 
-  def merge(left: BlockStatsV1, right: BlockStatsV1): BlockStatsV1 = {
+  def merge(left: EthereumBlockStatsV1, right: EthereumBlockStatsV1): EthereumBlockStatsV1 = {
     require(left.blockNumber == right.blockNumber)
     require(left.date == right.date)
-    BlockStatsV1(left.blockNumber, left.date, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
+    EthereumBlockStatsV1(left.blockNumber, left.date, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
   }
 }
 
@@ -45,12 +46,28 @@ object ElasticsearchDataStatsConfig {
 }
 
 trait EsType[T] {
-  def esType: String
+  protected def _indexName: String
+  final def indexName: String = _indexName.toLowerCase()
+  def typeVersion: String
+
+  def getEsIndex: String = s"$indexName/$typeVersion"
 }
 
 object EsType {
-  implicit def esType[T](implicit classTag: ClassTag[T]): EsType[T] = new  EsType[T] {
-    override val esType: String = classTag.runtimeClass.getSimpleName
+  private val classNameRegex = """([\w]+)(V\d+)""".r
+  implicit def esType[T](implicit classTag: ClassTag[T]): EsType[T] = {
+    classTag.runtimeClass.getSimpleName match {
+      case classNameRegex(index, version) =>
+        new  EsType[T] {
+          override val _indexName: String = index
+          override val typeVersion: String = version
+        }
+      case className =>
+        new  EsType[T] {
+          override val _indexName: String = className
+          override val typeVersion: String = "na"
+        }
+    }
   }
 }
 
@@ -63,7 +80,7 @@ class ElasticsearchDataStatsReporter()
     storeToES(config, ratesData)
   }
 
-  private def processEthereum(config: ElasticsearchDataStatsConfig): Dataset[BlockStatsV1] = {
+  private def processEthereum(config: ElasticsearchDataStatsConfig): Dataset[EthereumBlockStatsV1] = {
     val sess = spark
     import sess.implicits._
     val onBoarded = datasetStore.loadParquet(config.ethereumTxDefinition.dataKey.onBoarded,
@@ -71,13 +88,13 @@ class ElasticsearchDataStatsReporter()
     onBoarded
       .map(
         tx =>
-          BlockStatsV1(tx.blockNumber, tx.timestamp.toInstant.toString, 1, Seq(tx.sendAddress))
+          EthereumBlockStatsV1(tx.blockNumber, tx.timestamp.toInstant.toString, 1, Seq(tx.sendAddress))
       )
       .groupByKey(_.blockNumber)
-      .reduceGroups(BlockStatsV1.merge _)
+      .reduceGroups(EthereumBlockStatsV1.merge _)
       .map(_._2)
       // transactions are counted twice.
-      .map(results => BlockStatsV1(results.blockNumber, results.date, results.numTx/2, results.addresses))
+      .map(results => EthereumBlockStatsV1(results.blockNumber, results.date, results.numTx/2, results.addresses))
   }
 
   private def processRates(config: ElasticsearchDataStatsConfig)
@@ -87,8 +104,9 @@ class ElasticsearchDataStatsReporter()
     val millisInDay = 86400000 // 3600 * 24 *  1000
     val yesterday = new Date(Instant.now().truncatedTo(ChronoUnit.DAYS).toEpochMilli - millisInDay)
     val maxDateInES = Try {
-      spark.esDF(s"${config.elasticsearchIndex}/${esType.esType}",createEsConfig(config))
-        .withColumn("date", F.to_date($"date","yyyy-MM-dd"))
+      val frame = spark.esDF(esType.getEsIndex, createEsConfig(config))
+        .withColumn("date", F.to_date($"date" / 1000 cast DataTypes.TimestampType))
+      frame
         .agg(F.max("date"))
         .as[Option[Date]]
         .head()
@@ -116,9 +134,7 @@ class ElasticsearchDataStatsReporter()
     val now_ts = Timestamp.from(Instant.now())
     val withTS = results.withColumn("published_on",F.lit(now_ts))
 
-    withTS.coalesce(10).saveToEs(s"${config.elasticsearchIndex}/${esType.esType}",
-      createEsConfig(config)
-    )
+    withTS.coalesce(10).saveToEs(esType.getEsIndex, createEsConfig(config))
   }
 }
 
