@@ -104,9 +104,8 @@ class ElasticsearchDataStatsReporter()
     val millisInDay = 86400000 // 3600 * 24 *  1000
     val yesterday = new Date(Instant.now().truncatedTo(ChronoUnit.DAYS).toEpochMilli - millisInDay)
     val maxDateInES = Try {
-      val frame = spark.esDF(esType.getEsIndex, createEsConfig(config))
+      spark.esDF(esType.getEsIndex, createEsConfig(config))
         .withColumn("date", F.to_date($"date" / 1000 cast DataTypes.TimestampType))
-      frame
         .agg(F.max("date"))
         .as[Option[Date]]
         .head()
