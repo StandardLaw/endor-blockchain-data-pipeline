@@ -130,9 +130,8 @@ class ElasticsearchDataStatsReporter()
 
   private def storeToES[T: Encoder: ClassTag](config: ElasticsearchDataStatsConfig, results: Dataset[T])
                                              (implicit esType: EsType[T]): Unit = {
-    val now_ts = Timestamp.from(Instant.now())
-    val withTS = results.withColumn("published_on",F.lit(now_ts))
-
+    val now_ts = Timestamp.from(Instant.now()).toString
+    val withTS = results.withColumn("published_on",(F.lit(now_ts)))
     withTS.coalesce(10).saveToEs(esType.getEsIndex, createEsConfig(config))
   }
 }
