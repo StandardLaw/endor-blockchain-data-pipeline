@@ -129,9 +129,17 @@ class ElasticsearchDataStatsReporter()
     )
 
   private def storeToES[T: Encoder: ClassTag](config: ElasticsearchDataStatsConfig, results: Dataset[T])
-                                             (implicit esType: EsType[T]): Unit = {
+                                             (implicit esType: EsType[T],
+                                              encoder: Encoder[T]) : Unit = {
     val now_ts = Timestamp.from(Instant.now()).toString
     val withTS = results.withColumn("published_on",(F.lit(now_ts)))
+
+    val timestampColumns = withTS.schema.filter(_.dataType == DataTypes.TimestampType).map(_.name).toSet
+          val dateColumnsInEncoder = encoder.schema.filter(_.dataType == DataTypes.DateType).map(_.name).toSet
+          val columnsToConvert = timestampColumns intersect dateColumnsInEncoder
+          columnsToConvert.foldLeft(withTS) {
+              case (df, col) => df.withColumn(col, F.to_date(F.col(col)))
+            }
     withTS.coalesce(10).saveToEs(esType.getEsIndex, createEsConfig(config))
   }
 }
