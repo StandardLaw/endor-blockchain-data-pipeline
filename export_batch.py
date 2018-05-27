@@ -91,7 +91,7 @@ def export_logs(first_export, last_export):
 def export():
     try:
         first_export = get_last_exported_block() + 1
-        last_export = get_last_fetched_block() - 10
+        last_export = get_last_fetched_block() - 50
     except:
         send_to_slack('Could not get export blocks')
         LOGGER.error("Exception in main", exc_info=True)
@@ -110,15 +110,17 @@ def export():
         LOGGER.info("Removing temp dirs")
         shutil.rmtree(blocks_export_directory)
         shutil.rmtree(logs_directory)
-        send_to_slack('Successfully exported blocks and logs in range {} - {}'.format(first_export, last_export))
+        send_to_slack('Successfully exported blocks and logs',
+                      '#25ce25', [{'short': False, 'value': '{} - {}'.format(first_export, last_export)}])
     except:
-        send_to_slack('Could not export blocks and logs in range {} - {}'.format(first_export, last_export))
+        send_to_slack('Could not export blocks and logs',
+                      '#e81219', [{'short': False, 'value': '{} - {}'.format(first_export, last_export)}])
         LOGGER.error("Exception in main", exc_info=True)
 
 
-def send_to_slack(message):
+def send_to_slack(message, color, fields):
     requests.post("https://hooks.slack.com/services/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",
-                  json={'text': message})
+                  json={'text': message, 'color': color, 'fields': fields})
 
 
 if __name__ == "__main__":
