@@ -1,6 +1,7 @@
 package com.endor.blockchain.ethereum.datastats
 
 import java.sql.{Date, Timestamp}
+import java.time.Instant
 
 import com.endor.blockchain.ethereum.tokens.AggregatedRates
 import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
@@ -56,12 +57,13 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     import sess.implicits._
     val container = createContainer()
     val batchId = "my_batch"
+    val nowTs = new Date(Instant.now().toEpochMilli).toString
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDsTransaction"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer"), DataId("testDsRates"))
     val config = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt)
+      "test1", node.ip, node.port.toInt, nowTs)
 
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
     val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
@@ -77,7 +79,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
       .groupByKey(_.blockNumber)
       .mapGroups {
         (blockNumber, txIt) =>
-          val a = txIt.foldLeft(EthereumBlockStatsV1(blockNumber, ts, 0, Seq.empty)) {
+          val a = txIt.foldLeft(EthereumBlockStatsV1(blockNumber, ts, nowTs,0, Seq.empty)) {
             case (acc, tx) => acc.copy(numTx = acc.numTx + 1, date = tx.timestamp.toInstant.toString, addresses = acc.addresses :+ tx.sendAddress)
           }
           a.copy(numTx = a.numTx / 2, addresses = a.addresses.distinct)
@@ -103,16 +105,20 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
       inputDSFirst.withColumn("batch_id", F.lit(batchId)).as[AggregatedRates])
     container.driver.run(config = config)
 
-
-    val respFirst = client.execute {
-      val esType = implicitly[EsType[AggregatedRates]]
+    val response = client.execute {
+      val esType = implicitly[EsType[ERC20RatesStatsV1]]
       searchWithType(esType.indexName / esType.typeVersion) limit inputDSFirst.count().toInt + 100
     }.await
-    respFirst.isRight should be(true)
-    respFirst match {
+    response.isRight should be(true)
+    response match {
       case Right(success) =>
-        val results = clientResponseToObjects[AggregatedRates](success)
-        val expected = inputDSFirst.collect()
+        val results = clientResponseToObjects[ERC20RatesStatsV1](success).distinct
+        val expected = inputDSFirst
+          .withColumn("publishedOn", F.lit(config.publishedOn))
+          .as[ERC20RatesStatsV1]
+          .collect()
+        val intersect = results.filterNot(expected.contains)
+        val _ = intersect
         results should contain theSameElementsAs expected
       case _ =>
     }
@@ -123,9 +129,10 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val container = createContainer()
     System.setProperty("es.set.netty.runtime.available.processors", "false")
     val batchId = "my_batch_basic"
+    val nowTs = new Date(Instant.now().toEpochMilli).toString
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerBasic: Test rates single Day"), DataId("testDsTransactionBasic: Test rates single Day"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer1"), DataId("testDsRates1"))
-    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/rates/single_day.parquet").toString
+    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/rates/single.parquet").toString
     val inputDs = spark.read.parquet(inputPath)
       .withColumn("date", F.to_date($"date", "yyyy-MM-dd"))
       .as[AggregatedRates]
@@ -133,7 +140,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val configFirst = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt)
+      "test1", node.ip, node.port.toInt, nowTs)
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
       spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
     runAndCompare(inputDs, container, configFirst, dataKeyRates, "2019-01-01", node.client, batchId)
@@ -149,25 +156,24 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerAdvanced: Test rates with Maxdate"),
       DataId("testDsTransactionAdvanced: Test rates with Maxdate"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer"), DataId("testDsRates"))
+    container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
+      spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/rates/2018-05-15-rates.parquet").toString
+    val nowTs = new Date(Instant.now().toEpochMilli).toString
     val inputDs = spark.read.parquet(inputPath)
       .withColumn("date", F.to_date($"date", "yyyy-MM-dd"))
       .as[AggregatedRates]
-
-
     val configFirst = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt)
-    container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
-      spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
+      "test1", node.ip, node.port.toInt, nowTs)
     runAndCompare(inputDs, container, configFirst, dataKeyRates, "2016-01-01", node.client, batchId)
 
 
-    val configSecond = ElasticsearchDataStatsConfig(
-      DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
-      DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test2", node.ip, node.port.toInt)
-    runAndCompare(inputDs, container, configSecond, dataKeyRates, "2017-01-01", node.client, batchId)
+    val configSecond = configFirst.copy(elasticsearchIndex = "test2")
+    runAndCompare(inputDs, container, configSecond, dataKeyRates, "2016-01-02", node.client, batchId)
+
+    val configThree = configFirst.copy(elasticsearchIndex = "test3")
+    runAndCompare(inputDs, container, configThree, dataKeyRates, "2016-02-01", node.client, batchId)
   }
 }

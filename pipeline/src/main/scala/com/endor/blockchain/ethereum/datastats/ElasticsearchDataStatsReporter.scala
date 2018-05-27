@@ -1,6 +1,6 @@
 package com.endor.blockchain.ethereum.datastats
 
-import java.sql.{Date, Timestamp}
+import java.sql.Date
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -10,7 +10,6 @@ import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{BatchLoadOption, DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._
-import org.apache.spark.sql.types.DataTypes
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession, functions => F}
 import org.elasticsearch.hadoop.EsHadoopIllegalArgumentException
 import org.elasticsearch.spark.sql._
@@ -19,7 +18,16 @@ import play.api.libs.json.{Json, OFormat}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-final case class EthereumBlockStatsV1(blockNumber: Long, date: String, numTx: Int, addresses: Seq[String])
+final case class EthereumBlockStatsV1(blockNumber: Long, date: String,publishedOn: String, numTx: Int, addresses: Seq[String])
+final case class ERC20RatesStatsV1(date: String, publishedOn: String, rateName: String, rateSymbol: String,
+                                   metaName: Option[String], metaSymbol: Option[String], address: Option[String],
+                                   open: Double, high: Double, low: Double, close: Double, marketCap: Option[Double])
+
+object ERC20RatesStatsV1 {
+  implicit val format: OFormat[ERC20RatesStatsV1] = Json.format
+  implicit val encoder: Encoder[ERC20RatesStatsV1] = Encoders.product
+}
+
 object EthereumBlockStatsV1 {
   implicit val format: OFormat[EthereumBlockStatsV1] = Json.format
   implicit val encoder: Encoder[EthereumBlockStatsV1] = Encoders.product
@@ -27,7 +35,7 @@ object EthereumBlockStatsV1 {
   def merge(left: EthereumBlockStatsV1, right: EthereumBlockStatsV1): EthereumBlockStatsV1 = {
     require(left.blockNumber == right.blockNumber)
     require(left.date == right.date)
-    EthereumBlockStatsV1(left.blockNumber, left.date, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
+    EthereumBlockStatsV1(left.blockNumber, left.date, left.publishedOn, right.numTx + left.numTx, (left.addresses ++ right.addresses).distinct)
   }
 }
 
@@ -39,7 +47,7 @@ object DatasetDefinition {
 
 final case class ElasticsearchDataStatsConfig(ethereumTxDefinition: DatasetDefinition[ProcessedTransaction],
                                               etherRatesDefinition: DatasetDefinition[AggregatedRates],
-                                              elasticsearchIndex: String, esHost: String, esPort: Int)
+                                              elasticsearchIndex: String, esHost: String, esPort: Int, publishedOn: String)
 
 object ElasticsearchDataStatsConfig {
   implicit val format: OFormat[ElasticsearchDataStatsConfig] = Json.format[ElasticsearchDataStatsConfig]
@@ -73,6 +81,7 @@ object EsType {
 
 class ElasticsearchDataStatsReporter()
                                     (implicit spark: SparkSession, datasetStore: DatasetStore) {
+
   def run(config: ElasticsearchDataStatsConfig): Unit = {
     val etherData = processEthereum(config)
     storeToES(config, etherData)
@@ -88,24 +97,24 @@ class ElasticsearchDataStatsReporter()
     onBoarded
       .map(
         tx =>
-          EthereumBlockStatsV1(tx.blockNumber, tx.timestamp.toInstant.toString, 1, Seq(tx.sendAddress))
+          EthereumBlockStatsV1(tx.blockNumber, tx.timestamp.toInstant.toString, config.publishedOn, 1, Seq(tx.sendAddress))
       )
       .groupByKey(_.blockNumber)
       .reduceGroups(EthereumBlockStatsV1.merge _)
       .map(_._2)
       // transactions are counted twice.
-      .map(results => EthereumBlockStatsV1(results.blockNumber, results.date, results.numTx/2, results.addresses))
+      .map(results => EthereumBlockStatsV1(results.blockNumber, results.date, results.publishedOn,
+      results.numTx/2, results.addresses))
   }
 
   private def processRates(config: ElasticsearchDataStatsConfig)
-                          (implicit esType: EsType[AggregatedRates]): Dataset[AggregatedRates] = {
-    val sess = spark
-    import sess.implicits._
+                          (implicit esType: EsType[ERC20RatesStatsV1]): Dataset[ERC20RatesStatsV1] = {
+    import spark.implicits._
     val millisInDay = 86400000 // 3600 * 24 *  1000
     val yesterday = new Date(Instant.now().truncatedTo(ChronoUnit.DAYS).toEpochMilli - millisInDay)
     val maxDateInES = Try {
       spark.esDF(esType.getEsIndex, createEsConfig(config))
-        .withColumn("date", F.to_date($"date" / 1000 cast DataTypes.TimestampType))
+        .withColumn("date", F.to_date($"date"))
         .agg(F.max("date"))
         .as[Option[Date]]
         .head()
@@ -116,8 +125,10 @@ class ElasticsearchDataStatsReporter()
     }
     val loaded = datasetStore.loadParquet(config.etherRatesDefinition.dataKey.onBoarded,
       batchLoadOption = config.etherRatesDefinition.batchLoadOption)
-    maxDateInES.map(maxDate => loaded.filter($"date" > maxDate)).getOrElse(loaded)
-      .filter($"date" <= yesterday)
+      maxDateInES.map(maxDate => loaded.filter($"date" > maxDate)).getOrElse(loaded)
+      .filter($"date" <= yesterday).as[AggregatedRates]
+      .map(x => ERC20RatesStatsV1(x.date.toString, config.publishedOn, x.rateName, x.rateSymbol, x.metaName, x.metaSymbol,
+      x.address, x.open, x.high, x.low,x.close,x.marketCap))
   }
 
 
@@ -131,16 +142,7 @@ class ElasticsearchDataStatsReporter()
   private def storeToES[T: Encoder: ClassTag](config: ElasticsearchDataStatsConfig, results: Dataset[T])
                                              (implicit esType: EsType[T],
                                               encoder: Encoder[T]) : Unit = {
-    val now_ts = Timestamp.from(Instant.now()).toString
-    val withTS = results.withColumn("published_on",(F.lit(now_ts)))
-
-    val timestampColumns = withTS.schema.filter(_.dataType == DataTypes.TimestampType).map(_.name).toSet
-          val dateColumnsInEncoder = encoder.schema.filter(_.dataType == DataTypes.DateType).map(_.name).toSet
-          val columnsToConvert = timestampColumns intersect dateColumnsInEncoder
-          columnsToConvert.foldLeft(withTS) {
-              case (df, col) => df.withColumn(col, F.to_date(F.col(col)))
-            }
-    withTS.coalesce(10).saveToEs(esType.getEsIndex, createEsConfig(config))
+    results.coalesce(10).saveToEs(esType.getEsIndex, createEsConfig(config))
   }
 }
 
