@@ -17,6 +17,7 @@ import org.apache.spark.sql.{Dataset, SaveMode, SparkSession, functions => F}
 import org.ethereum.core.{BlockSummary => JBlockSummary}
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
+import play.api.libs.json.{Json, OFormat}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
@@ -32,12 +33,20 @@ final case class DatabaseConfig(name: String, host: String, user: String, passwo
   }
 }
 
+object DatabaseConfig {
+  implicit val format: OFormat[DatabaseConfig] = Json.format
+}
+
 final case class BlockSummaryPipelineConfiguration(databaseConfig: DatabaseConfig,
                                                    transactionsOutput: DataKey[Transaction],
                                                    tokenTransactionsOutput: DataKey[TokenTransaction],
                                                    rewardsOutput: DataKey[BlockReward],
                                                    metadataCachePath: String,
                                                    metadataOutputPath: Option[DataKey[TokenMetadata]])
+
+object BlockSummaryPipelineConfiguration {
+  implicit val format: OFormat[BlockSummaryPipelineConfiguration] = Json.format
+}
 
 class BlockSummaryPipeline(scraper: TokenMetadataScraper)
                           (implicit spark: SparkSession, datasetStore: DatasetStore, loggerFactory: LoggerContext) {
