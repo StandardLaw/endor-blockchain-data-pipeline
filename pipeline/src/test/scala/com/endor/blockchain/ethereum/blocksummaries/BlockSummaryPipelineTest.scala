@@ -12,6 +12,7 @@ import com.wix.mysql.EmbeddedMysql
 import com.wix.mysql.EmbeddedMysql.anEmbeddedMysql
 import com.wix.mysql.ScriptResolver.classPathScript
 import com.wix.mysql.config.DownloadConfig.aDownloadConfig
+import com.wix.mysql.config.MysqldConfig.aMysqldConfig
 import com.wix.mysql.distribution.Version.v5_7_latest
 import org.apache.spark.sql.{SparkSession, functions => F}
 import org.scalatest.{Outcome, fixture}
@@ -56,7 +57,11 @@ class BlockSummaryPipelineTest extends fixture.FunSuite with SparkDriverSuite {
         .withCacheDir(System.getProperty("java.io.tmpdir"))
         .build()
 
-      anEmbeddedMysql(v5_7_latest, downloadConfig)
+      val config = aMysqldConfig(v5_7_latest)
+        .withPort(54655)
+        .build()
+
+      anEmbeddedMysql(config, downloadConfig)
         .addSchema("ethereum", classPathScript("/com/endor/blockchain/ethereum/db/001_init.sql"))
         .start()
     }
