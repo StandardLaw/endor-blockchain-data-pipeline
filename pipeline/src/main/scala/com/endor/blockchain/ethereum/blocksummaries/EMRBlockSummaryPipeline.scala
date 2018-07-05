@@ -7,6 +7,8 @@ import com.endor.infra.{BaseComponent, DIConfiguration, LoggingComponent}
 import com.endor.jobnik.JobnikSession
 import org.apache.spark.sql.SparkSession
 
+import scala.concurrent.ExecutionContext
+
 object EMRBlockSummaryPipeline extends SparkApplication[BlockSummaryPipelineConfiguration] {
   override protected def createEntryPointConfig(configuration: SparkEntryPointConfiguration[BlockSummaryPipelineConfiguration]): EntryPointConfig =
     EntryPointConfig("ParseBlockSummaries")
@@ -20,6 +22,7 @@ object EMRBlockSummaryPipeline extends SparkApplication[BlockSummaryPipelineConf
         override implicit def spark: SparkSession = sparkSession
         override val diConfiguration: DIConfiguration = diConf
       }
+    implicit val ec: ExecutionContext = ExecutionContext.global
     container.driver.run(configuration)
   }
 }
