@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.{Path, Paths}
 import java.sql.{Date, Timestamp}
 
+import com.endor.context.Context
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.test.SharedSparkSession
 import org.scalatest.{BeforeAndAfterEachTestData, Matchers, Suite, TestData}
@@ -22,6 +23,7 @@ trait SparkDriverSuite extends SharedSparkSession with Matchers with BeforeAndAf
   protected def randomSeed: Long = _randomSeed
   protected val randomGenerator: Random = new Random(randomSeed)
   private val tempDirs: mutable.ListBuffer[File] = mutable.ListBuffer.empty
+  implicit val endorContext: Context = Context(testMode = true)
 
   private def deleteRecursively(file: File): Unit = {
     if (file.isDirectory)

@@ -63,4 +63,6 @@ trait DatasetStore {
   final def storeUntypedParquet(parquet: DataFrameSource with ParquetSourceType, dataFrame: DataFrame,
                                 partitionBy: Seq[String] = Seq.empty, saveMode: SaveMode = SaveMode.Overwrite): Unit =
     storeParquet[Row](parquet, dataFrame, partitionBy, saveMode)(RowEncoder(dataFrame.schema))
+
+  def delete(source: DatasetSource[_]): Unit = {}
 }

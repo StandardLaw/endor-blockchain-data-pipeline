@@ -55,4 +55,13 @@ class InMemoryDatasetStore extends DatasetStore {
     internalMap
       .exists(x => (pathRegex findFirstIn x._1).isDefined)
   }
+
+  override def delete(source: DatasetSource[_]): Unit = {
+    val path = source.path
+    val pathRegex = new Regex("^" + path.replace("*", ".*") + "$")
+
+    internalMap
+      .filter(x => (pathRegex findFirstIn x._1).isDefined)
+      .foreach(x => internalMap.remove(x._1))
+  }
 }
