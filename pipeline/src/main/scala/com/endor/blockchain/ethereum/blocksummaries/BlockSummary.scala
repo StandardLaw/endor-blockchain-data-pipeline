@@ -53,7 +53,7 @@ object BlockHeader {
 
 }
 
-final case class BlockReward(from: String, to: String, value: Long)
+final case class BlockReward(timestamp: Timestamp, from: String, to: String, value: Long)
 
 object BlockReward {
   implicit val encoder: Encoder[BlockReward] = Encoders.product
@@ -80,6 +80,8 @@ object BlockSummary {
   }
 
   private def extractRewards(jblockSummary: JBlockSummary, transactions: Seq[Transaction]): Seq[BlockReward] = {
+    val block = jblockSummary.getBlock
+    val blockTime = new Timestamp(block.getTimestamp * 1000)
     val baseRewards = jblockSummary.getRewards.asScala.toMap.map {
       case (k, v) => k.hex -> BigInt(v)
     }
@@ -89,12 +91,12 @@ object BlockSummary {
       .toMap
     val totalFees = fees.values.reduceOption(_ + _).getOrElse(BigInt(0))
     val feeRewards = fees.map {
-      case (k, v) => BlockReward(k, coinBase, toMWei(v))
+      case (k, v) => BlockReward(blockTime, k, coinBase, toMWei(v))
     }
     baseRewards
       .map {
-        case (k, v) if k == coinBase => BlockReward(zeroAddress, k, toMWei(v - totalFees))
-        case (k, v) => BlockReward(zeroAddress, k, toMWei(v))
+        case (k, v) if k == coinBase => BlockReward(blockTime, zeroAddress, k, toMWei(v - totalFees))
+        case (k, v) => BlockReward(blockTime, zeroAddress, k, toMWei(v))
       }.toSeq ++ feeRewards
   }
 
