@@ -56,22 +56,28 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
 
   def loadDataFromSQL(configuration: BlockSummaryPipelineConfiguration)
                      (implicit context: Context): Dataset[Array[Byte]] = {
-    val highestLoadedBlock = datasetStore.loadParquet(configuration.transactionsOutput.onBoarded)
-      .agg(F.max("blockNumber")).as[Option[Long]].head.getOrElse(-1L)
+    val highestLoadedBlock = context.callsiteContext.enrichContext("Find highest loaded block") {
+      datasetStore.loadParquet(configuration.transactionsOutput.onBoarded)
+        .agg(F.max("blockNumber")).as[Option[Long]].head.getOrElse(-1L)
+    }
     val databaseConfig = configuration.databaseConfig
-    val highestAvailableBlock = spark.read.jdbc(databaseConfig.connectionString,
-      "(select max(blockNumber) from summaries) max_block", databaseConfig.connectionProperties)
-      .as[Long].collect().headOption.getOrElse(0L)
-    spark.read.jdbc(
-      databaseConfig.connectionString,
-      s"(SELECT data FROM summaries WHERE blockNumber > $highestLoadedBlock AND blockNumber <= $highestAvailableBlock) s",
-      "blockNumber",
-      highestLoadedBlock,
-      highestAvailableBlock,
-      if(context.testMode) 1 else 200,
-      databaseConfig.connectionProperties)
-      .select("data")
-      .as[Array[Byte]]
+    val highestAvailableBlock = context.callsiteContext.enrichContext("Find highest available block") {
+      spark.read.jdbc(databaseConfig.connectionString,
+        "(select max(blockNumber) from summaries) max_block", databaseConfig.connectionProperties)
+        .as[Long].collect().headOption.getOrElse(0L)
+    }
+    context.callsiteContext.enrichContext("Load data from MySQL") {
+      spark.read.jdbc(
+        databaseConfig.connectionString,
+        s"(SELECT data FROM summaries WHERE blockNumber > $highestLoadedBlock AND blockNumber <= $highestAvailableBlock) s",
+        "blockNumber",
+        highestLoadedBlock,
+        highestAvailableBlock,
+        if (context.testMode) 1 else 200,
+        databaseConfig.connectionProperties)
+        .select("data")
+        .as[Array[Byte]]
+    }
   }
 
   def run(configuration: BlockSummaryPipelineConfiguration)
@@ -104,9 +110,15 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
         ttx.timestamp
       )
     })
-    datasetStore.storeParquet(configuration.tokenTransactionsOutput.inbox, ttxWithTranslatedValues)
-    datasetStore.storeParquet(configuration.transactionsOutput.inbox, transactions)
-    datasetStore.storeParquet(configuration.rewardsOutput.inbox, rewards)
+    context.callsiteContext.enrichContext("Store token transactions") {
+      datasetStore.storeParquet(configuration.tokenTransactionsOutput.inbox, ttxWithTranslatedValues)
+    }
+    context.callsiteContext.enrichContext("Store ethereum transactions") {
+      datasetStore.storeParquet(configuration.transactionsOutput.inbox, transactions)
+    }
+    context.callsiteContext.enrichContext("Store ethereum rewards") {
+      datasetStore.storeParquet(configuration.rewardsOutput.inbox, rewards)
+    }
   }
 
   private def scrapeMissingMetadata(config: BlockSummaryPipelineConfiguration,
@@ -172,17 +184,21 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
 
   def getTokenMetadata(ttx: Dataset[TokenTransactionRawValue],
                        config: BlockSummaryPipelineConfiguration)
-                      (implicit ec: ExecutionContext): Dataset[TokenMetadata] = {
-    val metadataDs = spark
-      .read
-      .schema(TokenMetadata.encoder.schema)
-      .parquet(config.metadataCachePath)
-      .as[TokenMetadata]
-    val updatedMetadata = scrapeMissingMetadata(config, ttx, metadataDs)
+                      (implicit ec: ExecutionContext, context: Context): Dataset[TokenMetadata] = {
+    val updatedMetadata = context.callsiteContext.enrichContext("Load and scrape token metadata") {
+      val metadataDs = spark
+        .read
+        .schema(TokenMetadata.encoder.schema)
+        .parquet(config.metadataCachePath)
+        .as[TokenMetadata]
+     scrapeMissingMetadata(config, ttx, metadataDs)
+    }
     config.metadataOutputPath
       .foreach(key =>
-        datasetStore.storeParquet(key.inbox,
-          updatedMetadata.filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty)))
+        context.callsiteContext.enrichContext("Store token metadata") {
+          datasetStore.storeParquet(key.inbox,
+            updatedMetadata.filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty)))
+        }
       )
     updatedMetadata
   }
