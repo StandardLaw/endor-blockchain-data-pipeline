@@ -2,9 +2,10 @@ package com.endor.infra.spark
 
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.auth.{AWSCredentialsProviderChain, InstanceProfileCredentialsProvider}
+import org.scalatest.FunSuite
 import play.api.libs.json._
 
-class SparkApplicationTest extends SparkDriverFunSuite {
+class SparkApplicationTest extends FunSuite with SparkDriverSuite {
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def debugSparkApplication(json: JsObject): Unit = {
     val credentials = new AWSCredentialsProviderChain(

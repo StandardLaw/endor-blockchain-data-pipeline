@@ -24,7 +24,7 @@ import scala.concurrent.{Await, ExecutionContext}
 final case class EthereumTokensPipelineConfig(input: String, blocksInput: String,
                                               output: DataKey[ProcessedTokenTransaction],
                                               metadataCachePath: String,
-                                              metadataOutputPath: DataKey[TokenMetadata])
+                                              metadataOutputPath: Option[DataKey[TokenMetadata]])
 
 object EthereumTokensPipelineConfig {
   implicit val format: OFormat[EthereumTokensPipelineConfig] = Json.format[EthereumTokensPipelineConfig]
@@ -150,10 +150,11 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
 
     val updatedMetadata = scrapeMissingMetadata(config, parsedEvents, metadataDs)
 
-    datasetStore.storeParquet(
-      config.metadataOutputPath.inbox,
-      updatedMetadata.filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty))
-    )
+    config.metadataOutputPath
+      .foreach(key =>
+        datasetStore.storeParquet(key.inbox,
+          updatedMetadata.filter((metadata: TokenMetadata) => metadata.symbol.exists(!_.isEmpty)))
+      )
 
     val newBlockHeaders = spark
       .read

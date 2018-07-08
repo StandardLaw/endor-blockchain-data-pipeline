@@ -18,6 +18,7 @@ private[tokens] final case class RatesSnapshotRow(rateName: String, rateSymbol: 
 
 object RatesSnapshotRow {
   implicit val encoder: Encoder[RatesSnapshotRow] = Encoders.product[RatesSnapshotRow]
+  val esType: String = "RatesStatsV1"
 }
 
 final case class AggregatedRates(date: Date, rateName: String, rateSymbol: String,
@@ -25,7 +26,8 @@ final case class AggregatedRates(date: Date, rateName: String, rateSymbol: Strin
                                  open: Double, high: Double, low: Double, close: Double, marketCap: Option[Double])
 
 object AggregatedRates {
-  implicit val encoder: Encoder[AggregatedRates] = Encoders.product[AggregatedRates]
+  implicit val encoder: Encoder[AggregatedRates] = Encoders.product
+  implicit val format: OFormat[AggregatedRates] = Json.format
 }
 
 final case class TokenRatesAggregationConfig(ratesFactsKey: DataKey[RateRow],

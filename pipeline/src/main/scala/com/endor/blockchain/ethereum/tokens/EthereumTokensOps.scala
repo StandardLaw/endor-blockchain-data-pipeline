@@ -27,7 +27,7 @@ object EthereumTokensOps {
     val browser = JsoupBrowser.typed()
     val doc = browser.get("https://coinmarketcap.com/tokens/views/all/")
     val names = (doc >> elements("td[class='no-wrap currency-name']"))
-      .map(_ >> element("a[class='currency-name-container']"))
+      .map(_ >> element("a[class='currency-name-container link-secondary']"))
       .map(_.text)
       .map(normalizeName)
       .toSeq
