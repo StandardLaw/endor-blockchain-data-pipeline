@@ -70,7 +70,7 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
         "(select max(blockNumber) from summaries) max_block", databaseConfig.connectionProperties)
         .as[Long].collect().headOption.getOrElse(0L)
     }
-    val numPartitions = Seq((highestAvailableBlock - highestLoadedBlock) / 20, 6000).min.toInt
+    val numPartitions = Seq((highestAvailableBlock - highestLoadedBlock) / 50, 6000).min.toInt
     context.callsiteContext.enrichContext("Load data from MySQL") {
       spark.read.jdbc(
         databaseConfig.connectionString,
@@ -82,6 +82,7 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
         databaseConfig.connectionProperties)
         .select("data")
         .as[Array[Byte]]
+        .repartition(numPartitions)
     }
   }
 
