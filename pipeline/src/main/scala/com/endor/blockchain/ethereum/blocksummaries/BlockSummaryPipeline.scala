@@ -69,11 +69,11 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
     context.callsiteContext.enrichContext("Load data from MySQL") {
       spark.read.jdbc(
         databaseConfig.connectionString,
-        s"(SELECT data FROM summaries WHERE blockNumber > $highestLoadedBlock AND blockNumber <= $highestAvailableBlock) s",
+        s"(SELECT blockNumber, data FROM summaries WHERE blockNumber > $highestLoadedBlock AND blockNumber <= $highestAvailableBlock) s",
         "blockNumber",
         highestLoadedBlock,
         highestAvailableBlock,
-        if (context.testMode) 1 else 200,
+        if (context.testMode) 2 else 200,
         databaseConfig.connectionProperties)
         .select("data")
         .as[Array[Byte]]
@@ -124,17 +124,19 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
   private def scrapeMissingMetadata(config: BlockSummaryPipelineConfiguration,
                                     parsedEvents: Dataset[TokenTransactionRawValue],
                                     metadataDs: Dataset[TokenMetadata])
-                                   (implicit ec: ExecutionContext): Dataset[TokenMetadata] = {
+                                   (implicit ec: ExecutionContext, context: Context): Dataset[TokenMetadata] = {
     import parsedEvents.sparkSession.implicits._
 
-    val missingContracts = parsedEvents
-      .select("contractAddress")
-      .as[String]
-      .map(_.toLowerCase)
-      .distinct
-      .except(F.broadcast(metadataDs).select("address").as[String].map(_.toLowerCase))
-      .collect()
-      .toSeq
+    val missingContracts = context.callsiteContext.enrichContext("Find missing contracts") {
+      parsedEvents
+        .select("contractAddress")
+        .as[String]
+        .map(_.toLowerCase)
+        .distinct
+        .except(F.broadcast(metadataDs).select("address").as[String].map(_.toLowerCase))
+        .collect()
+        .toSeq
+    }
 
     logger.info(s"Found ${missingContracts.length} missing contract metadatas")
 
@@ -191,7 +193,7 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
         .schema(TokenMetadata.encoder.schema)
         .parquet(config.metadataCachePath)
         .as[TokenMetadata]
-     scrapeMissingMetadata(config, ttx, metadataDs)
+      scrapeMissingMetadata(config, ttx, metadataDs)
     }
     config.metadataOutputPath
       .foreach(key =>
