@@ -21,6 +21,7 @@ import play.api.libs.json.{Json, OFormat}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
+import scala.util.Try
 
 final case class DatabaseConfig(name: String, host: String, user: String, password: String, port: Int) {
   def connectionString: String = s"jdbc:mysql://$user:$password@$host:$port/$name"
@@ -58,8 +59,10 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
   def loadDataFromSQL(configuration: BlockSummaryPipelineConfiguration)
                      (implicit context: Context): Dataset[Array[Byte]] = {
     val highestLoadedBlock = context.callsiteContext.enrichContext("Find highest loaded block") {
-      datasetStore.loadParquet(configuration.transactionsOutput.onBoarded)
-        .agg(F.max("blockNumber")).as[Option[Long]].head.getOrElse(-1L)
+      Try(datasetStore.loadParquet(configuration.transactionsOutput.onBoarded))
+        .toOption
+        .flatMap(_.agg(F.max("blockNumber")).as[Option[Long]].head)
+        .getOrElse(-1L)
     }
     val databaseConfig = configuration.databaseConfig
     val highestAvailableBlock = context.callsiteContext.enrichContext("Find highest available block") {
@@ -92,9 +95,11 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
     val transactions = parsedSummaries.flatMap(_.ethereumTransactions)
     val tokenTransactions = parsedSummaries.flatMap(_.erc20Transactions)
     val rewards = parsedSummaries.flatMap(_.rewards)
-    val tokenMetadata = getTokenMetadata(tokenTransactions, configuration).collect()
-      .map(x => x.address -> x)
-      .toMap
+    val tokenMetadata = context.callsiteContext.enrichContext("Collect token metadata") {
+      getTokenMetadata(tokenTransactions, configuration).collect()
+        .map(x => x.address -> x)
+        .toMap
+    }
     val broadcastedMetadata = spark.sparkContext.broadcast(tokenMetadata)
     val ttxWithTranslatedValues = tokenTransactions.map(ttx => {
       val tokenDecimals = broadcastedMetadata.value.get(ttx.contractAddress)
@@ -115,7 +120,7 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
       .flatMap(ttx => Seq(ttx, ttx.flip))
     configuration.tokenTransactionsOutputs.foreach(tokenTransactionsOutput => {
       ioHandler.deleteFilesByPredicate(tokenTransactionsOutput.inbox.path, _ => true)
-      context.callsiteContext.enrichContext("Store token transactions") {
+      context.callsiteContext.enrichContext(s"Store token transactions for ${tokenTransactionsOutput.customer.id}") {
         datasetStore.storeParquet(tokenTransactionsOutput.inbox, ttxWithTranslatedValues)
       }
     })
