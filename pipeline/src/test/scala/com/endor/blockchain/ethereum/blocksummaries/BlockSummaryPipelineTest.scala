@@ -30,7 +30,7 @@ class BlockSummaryPipelineTest extends fixture.FunSuite with SparkDriverSuite {
     BlockSummaryPipelineConfiguration(
       DatabaseConfig("ethereum", "localhost", mysqlConfig.getUsername, mysqlConfig.getPassword, mysqlConfig.getPort),
       DataKey(CustomerId("testCustomer"), DataId("tx")),
-      DataKey(CustomerId("testCustomer"), DataId("ttx")),
+      Seq(DataKey(CustomerId("testCustomer"), DataId("ttx"))),
       DataKey(CustomerId("testCustomer"), DataId("rewards")),
       fixture.metadataPath, None
     )

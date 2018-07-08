@@ -11,7 +11,7 @@ import com.endor.context.Context
 import com.endor.infra.{LoggingComponent, SparkSessionComponent}
 import com.endor.spark.blockchain.ethereum.token.metadata._
 import com.endor.storage.dataset.{DatasetStore, DatasetStoreComponent}
-import com.endor.storage.io.IOHandlerComponent
+import com.endor.storage.io.{IOHandler, IOHandlerComponent}
 import com.endor.storage.sources._
 import org.apache.spark.sql.{Dataset, SaveMode, SparkSession, functions => F}
 import org.ethereum.core.{BlockSummary => JBlockSummary}
@@ -39,7 +39,7 @@ object DatabaseConfig {
 
 final case class BlockSummaryPipelineConfiguration(databaseConfig: DatabaseConfig,
                                                    transactionsOutput: DataKey[Transaction],
-                                                   tokenTransactionsOutput: DataKey[TokenTransaction],
+                                                   tokenTransactionsOutputs: Seq[DataKey[TokenTransaction]],
                                                    rewardsOutput: DataKey[BlockReward],
                                                    metadataCachePath: String,
                                                    metadataOutputPath: Option[DataKey[TokenMetadata]])
@@ -49,7 +49,8 @@ object BlockSummaryPipelineConfiguration {
 }
 
 class BlockSummaryPipeline(scraper: TokenMetadataScraper)
-                          (implicit spark: SparkSession, datasetStore: DatasetStore, loggerFactory: LoggerContext) {
+                          (implicit spark: SparkSession, datasetStore: DatasetStore,
+                           loggerFactory: LoggerContext, ioHandler: IOHandler) {
   import spark.implicits._
 
   private lazy val logger: Logger = loggerFactory.getLogger(this.getClass)
@@ -107,15 +108,22 @@ class BlockSummaryPipeline(scraper: TokenMetadataScraper)
         ByteArrayUtil.convertByteArrayToDouble(ttx.value, tokenDecimals - 3, decimalPrecision),
         ttx.transactionHash,
         ttx.transactionIndex,
-        ttx.timestamp
+        ttx.timestamp,
+        flipped = false
       )
     })
-    context.callsiteContext.enrichContext("Store token transactions") {
-      datasetStore.storeParquet(configuration.tokenTransactionsOutput.inbox, ttxWithTranslatedValues)
-    }
+      .flatMap(ttx => Seq(ttx, ttx.flip))
+    configuration.tokenTransactionsOutputs.foreach(tokenTransactionsOutput => {
+      ioHandler.deleteFilesByPredicate(tokenTransactionsOutput.inbox.path, _ => true)
+      context.callsiteContext.enrichContext("Store token transactions") {
+        datasetStore.storeParquet(tokenTransactionsOutput.inbox, ttxWithTranslatedValues)
+      }
+    })
+    ioHandler.deleteFilesByPredicate(configuration.transactionsOutput.inbox.path, _ => true)
     context.callsiteContext.enrichContext("Store ethereum transactions") {
       datasetStore.storeParquet(configuration.transactionsOutput.inbox, transactions)
     }
+    ioHandler.deleteFilesByPredicate(configuration.rewardsOutput.inbox.path, _ => true)
     context.callsiteContext.enrichContext("Store ethereum rewards") {
       datasetStore.storeParquet(configuration.rewardsOutput.inbox, rewards)
     }

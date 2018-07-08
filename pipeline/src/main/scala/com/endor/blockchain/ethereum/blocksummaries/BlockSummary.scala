@@ -19,7 +19,10 @@ object TokenTransactionRawValue {
 
 final case class TokenTransaction(contractAddress: String, blockNumber: Long, fromAddress: String,
                                   toAddress: String, value: Double, transactionHash: String,
-                                  transactionIndex: Int, timestamp: Timestamp)
+                                  transactionIndex: Int, timestamp: Timestamp, flipped: Boolean) {
+  def flip: TokenTransaction = copy(fromAddress = toAddress, toAddress = fromAddress,
+    value = -value, flipped = !flipped)
+}
 
 object TokenTransaction {
   implicit val encoder: Encoder[TokenTransaction] = Encoders.product
@@ -28,7 +31,10 @@ object TokenTransaction {
 final case class Transaction(timestamp: Timestamp, blockNumber: Long, nonce: String, value: Long,
                              sendAddress: String, receiveAddress: String, gasPrice: Long, gasLimit: Long,
                              data: Option[String], hash: String, contractAddress: Option[String],
-                             isInternal: Boolean, gasUsed: Long, successful: Boolean, fee: Long)
+                             isInternal: Boolean, gasUsed: Long, successful: Boolean, fee: Long, flipped: Boolean) {
+  def flip: Transaction = copy(sendAddress = receiveAddress, receiveAddress = sendAddress,
+    value = -value, flipped = !flipped)
+}
 
 object Transaction {
   implicit val encoder: Encoder[Transaction] = Encoders.product
@@ -124,16 +130,18 @@ object BlockSummary {
             Transaction(blockTime, blockNumber, it.getNonce.hex, toMWei(it.getValue.asBigInt),
               it.getSender.hex, it.getReceiveAddress.hex, it.getGasPrice.asLong, it.getGasLimit.asLong,
               Option(it.getData).map(_.hex), it.getHash.hex, Option(it.getContractAddress).map(_.hex),
-              isInternal = true, tes.getGasUsed.longValue(), !tes.isFailed, 0)
+              isInternal = true, tes.getGasUsed.longValue(), !tes.isFailed, 0, flipped = false)
           )
+          .flatMap(orig => Seq(orig, orig.flip))
         val ethereumjTx = tes.getTransaction
         val tx = Transaction(blockTime, blockNumber, ethereumjTx.getNonce.hex,
           toMWei(ethereumjTx.getValue.asBigInt), ethereumjTx.getSender.hex,
-          ethereumjTx.getReceiveAddress.hex, ethereumjTx.getGasPrice.asLong, ethereumjTx.getGasLimit.asLong,
+          Option(ethereumjTx.getReceiveAddress).map(_.hex).getOrElse(s"0x$zeroAddress"),
+          ethereumjTx.getGasPrice.asLong, ethereumjTx.getGasLimit.asLong,
           Option(ethereumjTx.getData).map(_.hex), ethereumjTx.getHash.hex,
           Option(ethereumjTx.getContractAddress).map(_.hex), isInternal = false, tes.getGasUsed.longValue(),
-          !tes.isFailed, toMWei(BigInt(tes.getFee)))
-        tx :: internalTx
+          !tes.isFailed, toMWei(BigInt(tes.getFee)), flipped = false)
+        tx :: tx.flip :: internalTx
       })
   }
 }
