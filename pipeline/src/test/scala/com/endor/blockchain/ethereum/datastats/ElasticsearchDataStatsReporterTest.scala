@@ -3,8 +3,8 @@ package com.endor.blockchain.ethereum.datastats
 import java.sql.{Date, Timestamp}
 import java.time.Instant
 
+import com.endor.blockchain.ethereum.blocksummaries.Transaction
 import com.endor.blockchain.ethereum.tokens.AggregatedRates
-import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.spark.SparkDriverSuite
 import com.endor.infra.{BaseComponent, DIConfiguration}
 import com.endor.storage.dataset.BatchLoadOption
@@ -52,23 +52,23 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
       override implicit def spark: SparkSession = ElasticsearchDataStatsReporterTest.this.spark
     }
 
-  test("Test tansactions blocks 5609255-5609260") { node =>
+  test("Test tansactions two blocks 46147,46169") { node =>
     val sess = spark
     import sess.implicits._
     val container = createContainer()
     val batchId = "my_batch"
     val nowTs = new Date(Instant.now().toEpochMilli).toString
-    val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomer"), DataId("testDsTransaction"))
+    val dataKeyTransaction = DataKey[Transaction](CustomerId("testCustomer"), DataId("testDsTransaction"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer"), DataId("testDsRates"))
     val config = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
       "test1", node.ip, node.port.toInt, nowTs)
 
-    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/5609255-5609260.parquet").toString
-    val inputDs = spark.read.parquet(inputPath).as[ProcessedTransaction]
+    val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/two_blocks.parquet").toString
+    val inputDs = spark.read.parquet(inputPath).as[Transaction]
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
-      inputDs.withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
+      inputDs.withColumn("batch_id", F.lit(batchId)).as[Transaction])
     container.datasetStore.storeParquet(dataKeyRates.onBoarded,
       spark.emptyDataset[AggregatedRates].withColumn("batch_id", F.lit(batchId)).as[AggregatedRates])
 
@@ -130,7 +130,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     System.setProperty("es.set.netty.runtime.available.processors", "false")
     val batchId = "my_batch_basic"
     val nowTs = new Date(Instant.now().toEpochMilli).toString
-    val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerBasic: Test rates single Day"), DataId("testDsTransactionBasic: Test rates single Day"))
+    val dataKeyTransaction = DataKey[Transaction](CustomerId("testCustomerBasic: Test rates single Day"), DataId("testDsTransactionBasic: Test rates single Day"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer1"), DataId("testDsRates1"))
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/rates/single.parquet").toString
     val inputDs = spark.read.parquet(inputPath)
@@ -142,7 +142,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
       "test1", node.ip, node.port.toInt, nowTs)
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
-      spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
+      spark.emptyDataset[Transaction].withColumn("batch_id", F.lit(batchId)).as[Transaction])
     runAndCompare(inputDs, container, configFirst, dataKeyRates, "2019-01-01", node.client, batchId)
   }
 
@@ -153,11 +153,11 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val container = createContainer()
     System.setProperty("es.set.netty.runtime.available.processors", "false")
     val batchId = "my_batch"
-    val dataKeyTransaction = DataKey[ProcessedTransaction](CustomerId("testCustomerAdvanced: Test rates with Maxdate"),
+    val dataKeyTransaction = DataKey[Transaction](CustomerId("testCustomerAdvanced: Test rates with Maxdate"),
       DataId("testDsTransactionAdvanced: Test rates with Maxdate"))
     val dataKeyRates = DataKey[AggregatedRates](CustomerId("testCustomer"), DataId("testDsRates"))
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
-      spark.emptyDataset[ProcessedTransaction].withColumn("batch_id", F.lit(batchId)).as[ProcessedTransaction])
+      spark.emptyDataset[Transaction].withColumn("batch_id", F.lit(batchId)).as[Transaction])
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/rates/2018-05-15-rates.parquet").toString
     val nowTs = new Date(Instant.now().toEpochMilli).toString
     val inputDs = spark.read.parquet(inputPath)

@@ -5,8 +5,8 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 import com.endor.DataKey
+import com.endor.blockchain.ethereum.blocksummaries.Transaction
 import com.endor.blockchain.ethereum.tokens.AggregatedRates
-import com.endor.blockchain.ethereum.transaction.ProcessedTransaction
 import com.endor.infra.SparkSessionComponent
 import com.endor.storage.dataset.{BatchLoadOption, DatasetStore, DatasetStoreComponent}
 import com.endor.storage.sources._
@@ -45,7 +45,7 @@ object DatasetDefinition {
   implicit def format[T: Encoder]: OFormat[DatasetDefinition[T]] = Json.format[DatasetDefinition[T]]
 }
 
-final case class ElasticsearchDataStatsConfig(ethereumTxDefinition: DatasetDefinition[ProcessedTransaction],
+final case class ElasticsearchDataStatsConfig(ethereumTxDefinition: DatasetDefinition[Transaction],
                                               etherRatesDefinition: DatasetDefinition[AggregatedRates],
                                               elasticsearchIndex: String, esHost: String, esPort: Int, publishedOn: String)
 
