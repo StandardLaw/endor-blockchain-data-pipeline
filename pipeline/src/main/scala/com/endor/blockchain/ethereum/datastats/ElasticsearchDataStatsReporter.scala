@@ -135,6 +135,8 @@ class ElasticsearchDataStatsReporter()
   private def createEsConfig(config: ElasticsearchDataStatsConfig): Map[String, String] =
     Map(
       "es.nodes" -> config.esHost,
+      "es.net.http.auth.user" -> "elastic",
+      "es.net.http.auth.pass" -> "IwAy0yXR3ljMbEvrVTTKiuis",
       "es.port" -> config.esPort.toString,
       "es.nodes.wan.only" -> true.toString
     )
