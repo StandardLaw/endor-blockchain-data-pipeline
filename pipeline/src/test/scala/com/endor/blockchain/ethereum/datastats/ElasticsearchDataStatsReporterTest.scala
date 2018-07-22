@@ -63,7 +63,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val config = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt, nowTs)
+      "test1", node.ip, node.port.toInt, None, None, nowTs)
 
     val inputPath = this.getClass.getResource("/com/endor/blockchain/ethereum/blocks/parsed/two_blocks.parquet").toString
     val inputDs = spark.read.parquet(inputPath).as[Transaction]
@@ -140,7 +140,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val configFirst = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt, nowTs)
+      "test1", node.ip, node.port.toInt,None, None, nowTs)
     container.datasetStore.storeParquet(dataKeyTransaction.onBoarded,
       spark.emptyDataset[Transaction].withColumn("batch_id", F.lit(batchId)).as[Transaction])
     runAndCompare(inputDs, container, configFirst, dataKeyRates, "2019-01-01", node.client, batchId)
@@ -166,7 +166,7 @@ class ElasticsearchDataStatsReporterTest extends fixture.FunSuite with SparkDriv
     val configFirst = ElasticsearchDataStatsConfig(
       DatasetDefinition(dataKeyTransaction, BatchLoadOption.UseExactly(Seq(batchId))),
       DatasetDefinition(dataKeyRates, BatchLoadOption.UseExactly(Seq(batchId))),
-      "test1", node.ip, node.port.toInt, nowTs)
+      "test1", node.ip, node.port.toInt, None, None, nowTs)
     runAndCompare(inputDs, container, configFirst, dataKeyRates, "2016-01-01", node.client, batchId)
 
 

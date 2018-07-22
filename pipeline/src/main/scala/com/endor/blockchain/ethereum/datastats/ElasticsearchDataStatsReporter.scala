@@ -47,7 +47,9 @@ object DatasetDefinition {
 
 final case class ElasticsearchDataStatsConfig(ethereumTxDefinition: DatasetDefinition[Transaction],
                                               etherRatesDefinition: DatasetDefinition[AggregatedRates],
-                                              elasticsearchIndex: String, esHost: String, esPort: Int, publishedOn: String)
+                                              elasticsearchIndex: String, esHost: String, esPort: Int,
+                                              esUser: Option[String], esPassword: Option[String],
+                                              publishedOn: String)
 
 object ElasticsearchDataStatsConfig {
   implicit val format: OFormat[ElasticsearchDataStatsConfig] = Json.format[ElasticsearchDataStatsConfig]
@@ -135,8 +137,8 @@ class ElasticsearchDataStatsReporter()
   private def createEsConfig(config: ElasticsearchDataStatsConfig): Map[String, String] =
     Map(
       "es.nodes" -> config.esHost,
-      "es.net.http.auth.user" -> "elastic",
-      "es.net.http.auth.pass" -> "IwAy0yXR3ljMbEvrVTTKiuis",
+      "es.net.http.auth.user" ->  config.esUser.getOrElse(""),
+      "es.net.http.auth.pass" -> config.esPassword.getOrElse(""),
       "es.port" -> config.esPort.toString,
       "es.nodes.wan.only" -> true.toString
     )
