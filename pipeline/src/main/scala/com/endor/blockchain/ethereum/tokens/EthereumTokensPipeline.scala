@@ -47,15 +47,23 @@ class EthereumTokensPipeline(scraper: TokenMetadataScraper)
         case ((event, metadata), blockInfo) =>
           val tokenDecimals = Option(metadata).flatMap(_.decimals).map(Math.max(_, 3)).getOrElse(18)
           val decimalPrecision = Math.min(tokenDecimals, EthereumTokensPipeline.decimalPrecisionForValues)
-          ProcessedTokenTransaction(
-            event.contractAddress.hex,
-            event.blockNumber,
-            event.fromAddress.hex,
-            event.toAddress.hex,
-            ByteArrayUtil.convertByteArrayToDouble(event.value, tokenDecimals - 3, decimalPrecision),
-            event.transactionHash.hex,
-            event.transactionIndex,
-            blockInfo.timestamp)
+          try {
+            ProcessedTokenTransaction(
+              event.contractAddress.hex,
+              event.blockNumber,
+              event.fromAddress.hex,
+              event.toAddress.hex,
+              ByteArrayUtil.convertByteArrayToDouble(event.value, tokenDecimals - 3, decimalPrecision),
+              event.transactionHash.hex,
+              event.transactionIndex,
+              blockInfo.timestamp)
+          }
+          catch {
+            case e: Exception => {
+              logger.error(s"Failed to process token transaction on block ${event.blockNumber}")
+              throw e;
+            }
+          }
       }
   }
 
